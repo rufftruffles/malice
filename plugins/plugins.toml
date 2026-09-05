@@ -158,3 +158,13 @@ title = "Malice Plugin Configurations"
   repository = "https://github.com/malice-plugins/lmd.git"
   build = false
   mime = "*"
+
+[[plugin]]
+  enabled = true
+  name = "rizin"
+  description = "rizin (rz-bin) - binary analysis: headers, sections, imports, exports, symbols, strings"
+  category = "exe"
+  image = "malice/rizin"
+  repository = "https://github.com/malice-plugins/rizin.git"
+  build = false
+  mime = "*"
