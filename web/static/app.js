@@ -274,6 +274,9 @@ async function renderScanDetail(id) {
       if (isDetection(eng.name, res)) {
         dot = "s-threat"; label = "Detection";
         detail = `<div class="e-detail" title="${esc(detectionLabel(eng.name, res))}">${esc(detectionLabel(eng.name, res))}</div>`;
+      } else if (res.status === "skipped") {
+        dot = "s-off"; label = "Skipped";
+        if (res.reason) detail = `<div class="e-detail skip" title="${esc(res.reason)}">${esc(res.reason)}</div>`;
       } else {
         dot = "s-clean"; label = "Clean";
       }

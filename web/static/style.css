@@ -452,6 +452,11 @@ button { font-family: inherit; cursor: pointer; }
   max-height: 96px;
   overflow-y: auto;
 }
+.e-detail.skip {
+  color: var(--ink-muted);
+  background: var(--canvas-soft);
+  border-color: var(--hairline);
+}
 
 /* ---------- Empty / loading ---------- */
 .empty { text-align: center; padding: 70px 20px; color: var(--ink-muted); }
