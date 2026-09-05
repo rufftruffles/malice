@@ -103,6 +103,16 @@ func scanSetup(path string, logs, interactive bool) (*scanCtx, error) {
 	// Copy file to malice volume
 	container.CopyToVolume(docker, file)
 
+	// Record the file's MIME type on the doc so the API can report how many
+	// engines apply to this file type (the progress denominator). Best effort:
+	// a failed detection leaves the field empty and the client falls back to
+	// the total engine count.
+	if mime, err := persist.GetMimeType(docker, file.SHA256); err == nil {
+		file.MimeType = mime
+	} else {
+		log.Warnf("mime detection failed: %v", err)
+	}
+
 	return &scanCtx{path: path, file: &file, docker: docker, es: &es}, nil
 }
 
@@ -126,10 +136,15 @@ func scanRun(ctx *scanCtx) error {
 	// Run all Intel Plugins on the md5 hash associated with the file
 	plugins.RunIntelPlugins(ctx.docker, ctx.file.SHA1, ctx.scanID, true, elasticsearchInDocker)
 
-	// Get file's mime type
-	mimeType, err := persist.GetMimeType(ctx.docker, ctx.file.SHA256)
-	if err != nil {
-		return errors.Wrap(err, "failed to get file's mime type")
+	// Get file's mime type (already detected in scanSetup; re-detect only
+	// if the field is empty)
+	mimeType := ctx.file.MimeType
+	if mimeType == "" {
+		var err error
+		mimeType, err = persist.GetMimeType(ctx.docker, ctx.file.SHA256)
+		if err != nil {
+			return errors.Wrap(err, "failed to get file's mime type")
+		}
 	}
 
 	log.Debug("looking for plugins that will run on: ", mimeType)

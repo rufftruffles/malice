@@ -49,6 +49,7 @@ type File struct {
 	SHA1   string `json:"sha1,omitempty" structs:"sha1"`
 	SHA256 string `json:"sha256,omitempty" structs:"sha256"`
 	SHA512 string `json:"sha512,omitempty" structs:"sha512"`
+	MimeType string `json:"mime_type,omitempty" structs:"mime_type"`
 	// Ssdeep string `json:"ssdeep"`
 	// Arch string `json:"arch"`
 }

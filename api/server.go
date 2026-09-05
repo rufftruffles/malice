@@ -365,11 +365,19 @@ func summarizeScan(raw json.RawMessage) map[string]interface{} {
 	if threat {
 		verdict = "threat"
 	}
+	// engines_expected is how many of the enabled engines apply to this
+	// file's MIME type - the correct denominator for progress. Older docs
+	// have no mime_type; for those the client falls back to the total.
+	expected := 0
+	if mime, _ := doc.File["mime_type"].(string); mime != "" {
+		expected = len(plugins.GetPluginsForMime(mime, true))
+	}
 	return map[string]interface{}{
 		"file":             doc.File,
 		"scan_date":        doc.ScanDate,
 		"verdict":          verdict,
 		"engines_reported": reported,
+		"engines_expected": expected,
 		"detections":       detections,
 	}
 }

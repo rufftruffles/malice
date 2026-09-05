@@ -189,6 +189,7 @@ function activeScanInfo(data) {
   return {
     name: (s && s.file && s.file.name) || a.name || "file",
     reported: (s && s.engines_reported) || 0,
+    expected: (s && s.engines_expected) || 0,
   };
 }
 // The dropzone doubles as the scan-progress surface: while a scan is in flight
@@ -198,13 +199,17 @@ function dropzoneHTML(data) {
   const info = activeScanInfo(data);
   if (info) {
     const rep = info.reported;
-    const pct = Math.min(100, Math.round((rep / state.totalEngines) * 100));
+    // Only the engines that apply to this file's MIME type will ever
+    // report, so use that as the denominator (older docs fall back to
+    // the total engine count).
+    const total = info.expected || state.totalEngines;
+    const pct = Math.min(100, Math.round((rep / total) * 100));
     return `
     <div class="dropzone scanning" id="dropzone">
       <div class="dz-icon">${I.radar}</div>
       <div class="dz-title">Scanning <b class="up-name" style="color:var(--primary)">${esc(info.name)}</b></div>
       <div class="up-bar"><div class="up-fill" style="width:${pct}%"></div></div>
-      <div class="dz-hint up-meta"><b>${rep}</b> of ${state.totalEngines} engines reported</div>
+      <div class="dz-hint up-meta"><b>${rep}</b> of ${total} engines reported</div>
       <input type="file" id="file-input">
     </div>`;
   }
@@ -237,13 +242,14 @@ function renderScans(data) {
       const v = verdictOf(s);
       const f = s.file || {};
       const detCount = (s.detections || []).length;
+      const total = s.engines_expected || state.totalEngines;
       html += `
       <div class="scan-row" data-id="${esc(s.id || "")}" data-sha="${esc(f.sha256 || "")}">
         <div class="cell-name"><span class="file-ico">${I.file}</span><span class="fname" title="${esc(f.name)}">${esc(f.name || "unnamed")}</span></div>
         <div class="cell-hash" title="${esc(f.sha256)}">${esc(shortHash(f.sha256, 24))}</div>
         <div class="cell-size">${esc(fmtSize(f.size_human || f.size))}</div>
         <div class="cell-date">${esc(fmtDate(s.scan_date))}</div>
-        <div>${verdictBadge(v)}<div class="engines-pill" style="margin-top:6px"><b>${detCount}</b>/${state.totalEngines} flagged</div></div>
+        <div>${verdictBadge(v)}<div class="engines-pill" style="margin-top:6px"><b>${detCount}</b>/${total} flagged</div></div>
       </div>`;
     }
   }
@@ -348,13 +354,15 @@ async function renderScanDetail(id) {
   const plugins = data.plugins || {};
 
   const detCount = (data.detections || []).length;
+  // Only the engines that apply to this file's MIME type will ever report.
+  const total = data.engines_expected || state.totalEngines;
   let banner;
   if (v === "threat") {
-    banner = `<div class="verdict verdict-threat"><div class="v-ico">${I.shieldAlert}</div><div><div class="v-title">Threat detected</div><div class="v-sub">${detCount} engine${detCount === 1 ? "" : "s"} flagged this file · ${data.engines_reported}/${state.totalEngines} engines reported</div></div></div>`;
+    banner = `<div class="verdict verdict-threat"><div class="v-ico">${I.shieldAlert}</div><div><div class="v-title">Threat detected</div><div class="v-sub">${detCount} engine${detCount === 1 ? "" : "s"} flagged this file · ${data.engines_reported}/${total} engines reported</div></div></div>`;
   } else if (v === "scanning") {
-    banner = `<div class="verdict verdict-scan"><div class="v-ico">${I.radar}</div><div><div class="v-title">Scanning in progress</div><div class="v-sub">${data.engines_reported}/${state.totalEngines} engines reported · this page refreshes automatically</div></div></div>`;
+    banner = `<div class="verdict verdict-scan"><div class="v-ico">${I.radar}</div><div><div class="v-title">Scanning in progress</div><div class="v-sub">${data.engines_reported}/${total} engines reported · this page refreshes automatically</div></div></div>`;
   } else {
-    banner = `<div class="verdict verdict-clean"><div class="v-ico">${I.shieldCheck}</div><div><div class="v-title">No threats detected</div><div class="v-sub">All ${data.engines_reported} reporting engines returned clean · ${data.engines_reported}/${state.totalEngines} engines</div></div></div>`;
+    banner = `<div class="verdict verdict-clean"><div class="v-ico">${I.shieldCheck}</div><div><div class="v-title">No threats detected</div><div class="v-sub">All ${data.engines_reported} reporting engines returned clean · ${data.engines_reported}/${total} engines</div></div></div>`;
   }
 
   const hashes = [
