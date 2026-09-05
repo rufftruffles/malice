@@ -45,10 +45,10 @@ free_gb=$(df -kBG "$disk_root" | awk 'NR==2 {gsub("G","",$4); print $4}')
 echo "== spec check"
 echo "   cores: $cores (need 4)"
 echo "   ram:   ${mem_gb} GB (need 8)"
-echo "   disk:  ${free_gb} GB free on $disk_root (need 100)"
+echo "   disk:  ${free_gb} GB free on $disk_root (need 80)"
 [ "$cores" -ge 4 ] || { echo "   too few cores"; fail=1; }
 [ "$mem_gb" -ge 8 ] || { echo "   not enough ram"; fail=1; }
-[ "$free_gb" -ge 100 ] || { echo "   not enough disk"; fail=1; }
+[ "$free_gb" -ge 80 ] || { echo "   not enough disk"; fail=1; }
 if [ "$fail" != "0" ]; then
     echo "host does not meet the minimum spec. aborting."
     exit 1

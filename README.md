@@ -82,7 +82,7 @@ cd malice
 sudo ./deploy.sh
 ```
 
-Minimum spec: 4 cores, 8 GB RAM, 100 GB free disk. The script installs Docker if it
+Minimum spec: 4 cores, 8 GB RAM, 80 GB free disk. The script installs Docker if it
 is missing, pulls the server image, all 17 engine images, and Elasticsearch from GHCR,
 starts the stack, opens port 3993 in ufw if the firewall is active, and prints the URL.
 
