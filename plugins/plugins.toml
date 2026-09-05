@@ -46,6 +46,18 @@ title = "Malice Plugin Configurations"
 
 [[plugin]]
   enabled = true
+  name = "hashlookup"
+  description = "CIRCL hashlookup - NSRL/known-file hash lookup"
+  category = "intel"
+  image = "malice/hashlookup"
+  repository = "https://github.com/malice-plugins/hashlookup.git"
+  build = false
+  cmd = "lookup"
+  mime = "hash"
+  hashtypes = [ "md5", "sha1", "sha256" ]
+
+[[plugin]]
+  enabled = true
   name = "fileinfo"
   description = "ssdeep/TRiD/exiftool"
   category = "metadata"
