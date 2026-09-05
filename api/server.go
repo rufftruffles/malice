@@ -32,11 +32,19 @@ const maxUploadBytes = 512 << 20
 // and Elasticsearch.
 var scanSem = make(chan struct{}, 2)
 
-// scanFunc is injected by the serve command (avoids an api->commands import cycle).
-var scanFunc func(path string) error
+// scanInitFunc and scanRunFunc are injected by the serve command (avoids an
+// api->commands import cycle). scanInitFunc does the fast setup + file store and
+// returns the scan id synchronously; scanRunFunc fans out to the engines in the
+// background.
+var scanInitFunc func(path string) (string, error)
+var scanRunFunc func(path, scanID string) error
 
-// SetScanFunc wires the scan entry point (commands.APIScan) into the API.
-func SetScanFunc(fn func(path string) error) { scanFunc = fn }
+// SetScanFunc wires the scan entry points (commands.APIScanInit /
+// commands.APIScanRun) into the API.
+func SetScanFunc(initFn func(path string) (string, error), runFn func(path, scanID string) error) {
+	scanInitFunc = initFn
+	scanRunFunc = runFn
+}
 
 // Init loads plugins, configures the ES endpoint, and opens the
 // file-backed secrets store (engine credentials entered via the web UI).
@@ -184,7 +192,7 @@ func handlePlugins(w http.ResponseWriter, r *http.Request) {
 
 // handleUpload accepts a multipart file, stores it in a temp dir, and kicks off a scan.
 func handleUpload(w http.ResponseWriter, r *http.Request) {
-	if scanFunc == nil {
+	if scanInitFunc == nil || scanRunFunc == nil {
 		writeErr(w, http.StatusInternalServerError, "scan backend not wired")
 		return
 	}
@@ -238,6 +246,18 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate the scan id synchronously (fast setup + file store) so it can be
+	// returned in the response. The web client keys its in-flight set by scan id
+	// (not SHA) so re-uploading a file whose SHA already has completed scans does
+	// not mask those verdicts behind a "Scanning" badge.
+	scanID, err := scanInitFunc(dstPath)
+	if err != nil {
+		<-scanSem
+		os.RemoveAll(dir)
+		writeErr(w, http.StatusInternalServerError, "start scan: "+err.Error())
+		return
+	}
+
 	go func() {
 		defer func() {
 			<-scanSem
@@ -246,13 +266,14 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 			}
 			os.RemoveAll(dir)
 		}()
-		if err := scanFunc(dstPath); err != nil {
+		if err := scanRunFunc(dstPath, scanID); err != nil {
 			log.Errorf("scan of %s failed: %v", name, err)
 		}
 	}()
 
 	writeJSON(w, map[string]interface{}{
 		"status":  "queued",
+		"id":      scanID,
 		"sha256":  sha,
 		"name":    name,
 		"message": "scan started; poll /api/scans to follow progress",

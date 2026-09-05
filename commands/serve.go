@@ -20,7 +20,7 @@ func cmdServe(c *cli.Context) error {
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
 
 	api.Init()
-	api.SetScanFunc(APIScan)
+	api.SetScanFunc(APIScanInit, APIScanRun)
 	return api.Start(addr)
 }
 

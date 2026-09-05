@@ -56,7 +56,7 @@ const api = {
 /* ---------- State ---------- */
 const state = {
   totalEngines: 17,
-  active: new Map(), // sha256 -> { lastReported, stable, startedAt }
+  active: new Map(), // scan id -> { lastReported, stable, startedAt, name, sha }
   pollTimer: null,
 };
 
@@ -144,13 +144,11 @@ async function copyText(txt) {
 
 /* ---------- Verdict ---------- */
 function verdictOf(scan) {
-  // While a scan is still in flight (in state.active, not yet settled) show the
-  // animated "Scanning" badge so users know the results aren't final yet; this
-  // takes precedence over an early "threat" so a mid-scan detection doesn't look
-  // like a finished verdict. Once settled the entry leaves state.active and the
-  // final threat/clean verdict shows.
-  const sha = scan.file && scan.file.sha256;
-  if (sha && state.active.has(sha)) return "scanning";
+  // While a scan is still in flight (in state.active, keyed by scan id, not yet
+  // settled) show the animated "Scanning" badge so users know the results aren't
+  // final yet. Keying by scan id (not SHA) means re-uploading a file whose SHA
+  // already has completed scans does not mask those verdicts behind "Scanning".
+  if (scan.id && state.active.has(scan.id)) return "scanning";
   if (scan.verdict === "threat") return "threat";
   return "clean";
 }
@@ -181,13 +179,13 @@ async function pollHealth() {
 // null when no scan is active. `reported` is 0 until the scan doc lands in ES
 // (a few seconds of write latency after upload).
 function activeScanInfo(data) {
-  let bestSha = null;
-  for (const [sha, a] of state.active) {
-    if (bestSha === null || a.startedAt > state.active.get(bestSha).startedAt) bestSha = sha;
+  let bestId = null;
+  for (const [id, a] of state.active) {
+    if (bestId === null || a.startedAt > state.active.get(bestId).startedAt) bestId = id;
   }
-  if (bestSha === null) return null;
-  const a = state.active.get(bestSha);
-  const s = (data.scans || []).find((x) => x.file && x.file.sha256 === bestSha);
+  if (bestId === null) return null;
+  const a = state.active.get(bestId);
+  const s = (data.scans || []).find((x) => x.id === bestId);
   return {
     name: (s && s.file && s.file.name) || a.name || "file",
     reported: (s && s.engines_reported) || 0,
@@ -286,8 +284,8 @@ async function uploadFile(file) {
   };
   try {
     const res = await api.upload(file, (loaded, total) => updateUploadProgress(loaded, total));
-    if (res.sha256) {
-      state.active.set(res.sha256, { lastReported: 0, stable: 0, startedAt: Date.now(), name: file.name });
+    if (res.id) {
+      state.active.set(res.id, { lastReported: 0, stable: 0, startedAt: Date.now(), name: file.name, sha: res.sha256 });
     }
     ensurePolling();
     // refresh the list (also restores the dropzone after the progress bar)
@@ -414,9 +412,8 @@ async function renderScanDetail(id) {
   $$(".copy-btn").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); copyText(b.dataset.copy); }));
 
   // auto-refresh while scanning
-  const sha = f.sha256;
-  if (v === "scanning" && sha) {
-    state.active.set(sha, state.active.get(sha) || { lastReported: data.engines_reported, stable: 0, startedAt: Date.now() });
+  if (v === "scanning" && data.id) {
+    state.active.set(data.id, state.active.get(data.id) || { lastReported: data.engines_reported, stable: 0, startedAt: Date.now(), name: f.name, sha: f.sha256 });
     ensurePolling();
   }
 }
@@ -604,16 +601,16 @@ function ensurePolling() {
     // previously it set stable=1, which never reached the 99 the removal checks,
     // so a scan absent from the list (ES down at upload, failed write, deleted)
     // kept polling /api/scans every 2.5s forever.
-    for (const [sha, a] of state.active) {
+    for (const [id, a] of state.active) {
       if (Date.now() - a.startedAt > 150000) a.stable = 99;
     }
     let data;
     try { data = await api.get("/api/scans?size=100"); } catch { return; }
-    const bySha = {};
-    for (const s of data.scans || []) if (s.file && s.file.sha256) bySha[s.file.sha256] = s;
+    const byId = {};
+    for (const s of data.scans || []) if (s.id) byId[s.id] = s;
     let changed = false;
-    for (const [sha, a] of state.active) {
-      const s = bySha[sha];
+    for (const [id, a] of state.active) {
+      const s = byId[id];
       if (s && s.engines_reported !== a.lastReported) { a.lastReported = s.engines_reported; a.stable = 0; changed = true; }
       else if (s) {
         a.stable = (a.stable || 0) + 1;
@@ -626,7 +623,7 @@ function ensurePolling() {
         // AV, has reported before the scan is marked done.
         if (a.stable >= 8 && Date.now() - a.startedAt > 75000) a.stable = 99;
       }
-      if (a.stable === 99) state.active.delete(sha);
+      if (a.stable === 99) state.active.delete(id);
     }
     // re-render if on scans list or a detail of an active scan
     const hash = location.hash || "";
