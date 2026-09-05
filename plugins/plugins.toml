@@ -178,3 +178,4 @@ title = "Malice Plugin Configurations"
   repository = "https://github.com/malice-plugins/eset.git"
   build = false
   mime = "*"
+  env = ["ESET_LICENSE_KEY"]
