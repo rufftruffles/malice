@@ -106,6 +106,9 @@ function detectionLabel(name, res) {
   else if (["infected", "threat", "malicious"].includes(res.status)) d = res.status;
   if (d == null) d = "flagged";
   if (typeof d === "object") d = JSON.stringify(d);
+  // maldet reports hash-rule hits as "{SHA256}sig.name" — render as "sig.name (SHA256 match)"
+  const m = String(d).match(/^\{([A-Za-z0-9]+)\}(.+)$/);
+  if (m) d = m[2] + " (" + m[1] + " match)";
   d = String(d).replace(/\s+/g, " ").trim();
   if (d.length > 90) d = d.slice(0, 87) + "…";
   return d;
