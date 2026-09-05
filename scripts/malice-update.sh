@@ -1,5 +1,5 @@
 #!/bin/sh
-# malice-update — nightly refresh of signature-decaying engine images.
+# malice-update: nightly refresh of signature-decaying engine images.
 #
 # Rebuilds the engines whose value decays between builds (AV signatures and
 # rule sets are fetched at build time) and, when MALICE_REGISTRY is set and
@@ -48,9 +48,8 @@ for e in clamav kvrt yara; do
     fi
 done
 
-# lmd has no Makefile — direct docker build.
 log "building lmd"
-if docker build -t malice/lmd:latest lmd/; then
+if (cd lmd && make build && make tag); then
     log "built lmd"
 else
     log "ERROR: build failed: lmd"
@@ -67,7 +66,7 @@ if [ -n "$REGISTRY" ]; then
     log "pushed refreshed images to $REGISTRY (v$VERSION)"
 fi
 
-# Rebuilds leave the previous image dangling — drop it.
+# Rebuilds leave the previous image dangling; drop it.
 docker image prune -f >/dev/null 2>&1 || true
 
 log "done (fail=$fail)"
