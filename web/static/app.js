@@ -166,7 +166,7 @@ function renderScans(data) {
     </div>
     <div class="dropzone" id="dropzone">
       <div class="dz-icon">${I.upload}</div>
-      <div class="dz-title">Drop a file to scan, or <b style="color:var(--accent)">browse</b></div>
+      <div class="dz-title">Drop a file to scan, or <b style="color:var(--primary)">browse</b></div>
       <div class="dz-hint">Runs through all ${state.totalEngines} engines · AV, static analysis, intel &amp; document parsers</div>
       <input type="file" id="file-input">
     </div>
@@ -279,7 +279,7 @@ async function renderScanDetail(id) {
       }
     }
     return `<div class="engine-card">
-      <div class="e-top"><span class="e-name">${esc(eng.name)}</span><span class="e-cat">${esc(eng.category)}</span></div>
+      <div class="e-top"><span class="e-name">${esc(eng.name)}</span><span class="e-cat" data-cat="${esc(eng.category)}">${esc(eng.category)}</span></div>
       <div class="e-desc">${esc(eng.description || "")}</div>
       <div class="e-status"><span class="s-dot ${dot}"></span>${esc(label)}</div>
       ${detail}
@@ -335,12 +335,12 @@ async function renderEngines() {
       <p class="page-sub">${engines.length} detection engines · ${engines.filter((e) => e.enabled).length} enabled</p></div>
     </div>`;
   for (const cat of cats) {
-    html += `<h3 class="card" style="padding:12px 24px;margin:0 0 14px;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--fg-faint);font-size:12px">${esc(cat)} <span style="color:var(--fg-faint);font-family:var(--font-mono)">${byCat[cat].length}</span></h3>`;
+    html += `<h3 style="margin:0 0 14px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);display:flex;align-items:center;gap:8px">${esc(cat)} <span style="font-family:var(--font-mono);font-size:11px">${byCat[cat].length}</span></h3>`;
     html += `<div class="engines-grid stagger" style="margin-bottom:22px">` + byCat[cat].map((e) => `
       <div class="engine-card">
-        <div class="e-top"><span class="e-name">${esc(e.name)}</span><span class="e-cat">${e.enabled ? "enabled" : "disabled"}</span></div>
+        <div class="e-top"><span class="e-name">${esc(e.name)}</span><span class="e-cat ${e.enabled ? "cat-on" : "cat-off"}">${e.enabled ? "enabled" : "disabled"}</span></div>
         <div class="e-desc">${esc(e.description || "")}</div>
-        <div class="e-status"><span class="s-dot ${e.enabled ? "s-clean" : "s-off"}"></span>${e.enabled ? "Ready" : "Disabled"}<span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">${esc(e.image || "")}</span></div>
+        <div class="e-status"><span class="s-dot ${e.enabled ? "s-clean" : "s-off"}"></span>${e.enabled ? "Ready" : "Disabled"}<span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--ink-faint)">${esc(e.image || "")}</span></div>
       </div>`).join("") + `</div>`;
   }
   view.innerHTML = html;
