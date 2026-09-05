@@ -241,15 +241,24 @@ func (plugin Plugin) UpdatePluginFromRepository(docker *client.Docker) {
 	image.Build(docker, plugin.Repository, tags, buildArgs, labels, quiet)
 }
 
-// UpdateEnabledPlugins performs a docker pull on all enabled plugins checking for updates
+// UpdateEnabledPlugins pulls only the enabled plugin images that are not
+// already installed locally. Re-pulling installed images would clobber
+// locally rebuilt ones with whatever is on the remote registry.
 func UpdateEnabledPlugins(docker *client.Docker) {
 	// Pull busybox (used to copy samples to malice volume)
-	image.Pull(docker, "busybox", "latest")
-	// Pull blacktop/elk (used to store malice scan results data)
-	image.Pull(docker, config.Conf.DB.Image, "latest")
-	// Pull all enabled malice plugin images
+	if _, exists, _ := image.Exists(docker, "busybox"); !exists {
+		image.Pull(docker, "busybox", "latest")
+	}
+	// Pull the database image (used to store malice scan results data)
+	if _, exists, _ := image.Exists(docker, config.Conf.DB.Image); !exists {
+		image.Pull(docker, config.Conf.DB.Image, "latest")
+	}
+	// Pull enabled malice plugin images that are missing locally
 	for _, plugin := range GetEnabledPlugins() {
-		fmt.Println("[Updating Plugin] ===> ", plugin.Name)
+		if _, exists, _ := image.Exists(docker, plugin.Image); exists {
+			continue
+		}
+		fmt.Println("[Installing Plugin] ===> ", plugin.Name)
 		if plugin.Build {
 			plugin.UpdatePluginFromRepository(docker)
 		} else {
