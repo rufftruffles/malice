@@ -31,13 +31,25 @@ const api = {
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
     return r.json();
   },
-  async upload(file) {
-    const fd = new FormData();
-    fd.append("file", file);
-    const r = await fetch("/api/scans", { method: "POST", body: fd });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || r.statusText);
-    return j;
+  // XHR (not fetch) so we get upload.onprogress for the progress bar.
+  upload(file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/scans");
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total);
+      };
+      xhr.onload = () => {
+        let j = {};
+        try { j = JSON.parse(xhr.responseText); } catch (_) {}
+        if (xhr.status >= 200 && xhr.status < 300) resolve(j);
+        else reject(new Error(j.error || "HTTP " + xhr.status));
+      };
+      xhr.onerror = () => reject(new Error("network error"));
+      xhr.send(fd);
+    });
   },
 };
 
@@ -90,7 +102,9 @@ function isDetection(name, res) {
 const INTEL_ENGINES = new Set(["hashlookup", "nsrl", "shadow-server", "virustotal"]);
 function detectionLabel(name, res) {
   let d = null;
-  if (Array.isArray(res.detections) && res.detections.length) {
+  if (name === "virustotal" && (res.positives || 0) > 0) {
+    d = res.positives + " vendors detected" + (res.ratio ? " · " + res.ratio : "");
+  } else if (Array.isArray(res.detections) && res.detections.length) {
     const x = res.detections[0];
     d = (typeof x === "object") ? (x.name || x.detection || x.info || x.result) : x;
   } else if (Array.isArray(res.matches) && res.matches.length) {
@@ -181,13 +195,14 @@ function renderScans(data) {
     for (const s of rows) {
       const v = verdictOf(s);
       const f = s.file || {};
+      const detCount = (s.detections || []).length;
       html += `
       <div class="scan-row" data-id="${esc(s.id || "")}" data-sha="${esc(f.sha256 || "")}">
         <div class="cell-name"><span class="file-ico">${I.file}</span><span class="fname" title="${esc(f.name)}">${esc(f.name || "unnamed")}</span></div>
         <div class="cell-hash" title="${esc(f.sha256)}">${esc(shortHash(f.sha256, 24))}</div>
         <div class="cell-size">${esc(fmtSize(f.size_human || f.size))}</div>
         <div class="cell-date">${esc(fmtDate(s.scan_date))}</div>
-        <div>${verdictBadge(v)}<div class="engines-pill" style="margin-top:6px"><b>${s.engines_reported}</b>/${state.totalEngines} engines</div></div>
+        <div>${verdictBadge(v)}<div class="engines-pill" style="margin-top:6px"><b>${detCount}</b>/${state.totalEngines} flagged</div></div>
       </div>`;
     }
   }
@@ -221,19 +236,59 @@ function wireDropzone() {
 }
 
 async function uploadFile(file) {
-  toast("Scanning " + file.name + " …");
+  showUploadProgress(file.name, file.size);
+  const onScansList = () => {
+    const h = location.hash || "#/scans";
+    return h.startsWith("#/scans") && !h.includes("#/scans/");
+  };
   try {
-    const res = await api.upload(file);
+    const res = await api.upload(file, (loaded, total) => updateUploadProgress(loaded, total));
     if (res.sha256) {
       state.active.set(res.sha256, { lastReported: 0, stable: 0, startedAt: Date.now() });
     }
     ensurePolling();
-    // refresh the list
+    // refresh the list (also restores the dropzone after the progress bar)
     const data = await api.get("/api/scans?size=50");
-    if (location.hash.startsWith("#/scans") && !location.hash.includes("#/scans/")) renderScans(data);
+    if (onScansList()) renderScans(data); else resetDropzone();
   } catch (e) {
+    resetDropzone();
     toast("Upload failed: " + e.message, true);
   }
+}
+
+/* ---------- Upload progress ---------- */
+function showUploadProgress(name, size) {
+  const dz = $("#dropzone");
+  if (!dz) return;
+  dz.classList.add("uploading");
+  dz.innerHTML = `
+    <div class="dz-icon">${I.upload}</div>
+    <div class="dz-title">Uploading <b class="up-name" style="color:var(--primary)">${esc(name)}</b></div>
+    <div class="up-bar"><div class="up-fill"></div></div>
+    <div class="dz-hint up-meta"><span class="up-pct">0%</span> · <span class="up-bytes">0 B</span> of ${esc(fmtSize(size))}</div>
+    <input type="file" id="file-input">`;
+}
+function updateUploadProgress(loaded, total) {
+  const dz = $("#dropzone");
+  if (!dz) return;
+  const pct = total ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+  const fill = dz.querySelector(".up-fill");
+  const pctEl = dz.querySelector(".up-pct");
+  const bytesEl = dz.querySelector(".up-bytes");
+  if (fill) fill.style.width = pct + "%";
+  if (pctEl) pctEl.textContent = pct + "%";
+  if (bytesEl) bytesEl.textContent = fmtSize(loaded);
+}
+function resetDropzone() {
+  const dz = $("#dropzone");
+  if (!dz) return;
+  dz.classList.remove("uploading");
+  dz.innerHTML = `
+    <div class="dz-icon">${I.upload}</div>
+    <div class="dz-title">Drop a file to scan, or <b style="color:var(--primary)">browse</b></div>
+    <div class="dz-hint">Runs through all ${state.totalEngines} engines · AV, static analysis, intel &amp; document parsers</div>
+    <input type="file" id="file-input">`;
+  wireDropzone();
 }
 
 /* ---------- Scan detail ---------- */
@@ -280,6 +335,10 @@ async function renderScanDetail(id) {
       } else if (res.status === "skipped") {
         dot = "s-off"; label = "Skipped";
         if (res.reason) detail = `<div class="e-detail skip" title="${esc(res.reason)}">${esc(res.reason)}</div>`;
+      } else if (res.status === "error") {
+        dot = "s-err"; label = "Error";
+        const msg = res.error || res.reason || "engine error";
+        detail = `<div class="e-detail err" title="${esc(msg)}">${esc(msg)}</div>`;
       } else {
         dot = "s-clean"; label = "Clean";
       }

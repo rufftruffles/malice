@@ -226,6 +226,23 @@ button { font-family: inherit; cursor: pointer; }
 .dropzone .dz-hint { color: var(--ink-muted); font-size: 13.5px; margin-top: 6px; }
 .dropzone .dz-hint b { color: var(--primary); font-weight: 600; }
 .dropzone input[type="file"] { display: none; }
+.dropzone.uploading { border-style: solid; border-color: var(--primary); background: var(--primary-soft); }
+.up-bar {
+  height: 8px;
+  border-radius: var(--r-full);
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  margin: 16px auto 0;
+  max-width: 340px;
+}
+.up-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: var(--r-full);
+  background: var(--primary);
+  transition: width 120ms linear;
+}
+.up-meta { margin-top: 10px; font-family: var(--font-mono); font-size: 12px; }
 
 /* ---------- Scans table ---------- */
 .table-wrap {
@@ -436,6 +453,7 @@ button { font-family: inherit; cursor: pointer; }
 .s-threat { background: var(--danger); }
 .s-scan { background: var(--primary); }
 .s-off { background: var(--ink-faint); }
+.s-err { background: #d97706; }
 
 /* detection detail inside engine card */
 .e-detail {
@@ -456,6 +474,11 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink-muted);
   background: var(--canvas-soft);
   border-color: var(--hairline);
+}
+.e-detail.err {
+  color: #92400e;
+  background: rgba(217, 119, 6, 0.08);
+  border-color: rgba(217, 119, 6, 0.28);
 }
 
 /* ---------- Empty / loading ---------- */
