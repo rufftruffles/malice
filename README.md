@@ -7,6 +7,8 @@ files never leave your machine.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
+![EICAR test file, scanned by all 17 engines](docs/screenshots/scan-detail.png)
+
 ## Why
 
 Malice is a free, open-source alternative to VirusTotal that anyone can run, from an
@@ -139,11 +141,17 @@ malice serve --port 3993    # start the web UI + REST API
 
 ## Web UI
 
-A dependency-free single-page app served at `/`:
+A dependency-free single-page app served at `/`. The Scans page lists past scans,
+takes file uploads, and drills into any scan: verdict, file metadata and hashes,
+and the per-engine result grid. The Engines page shows the full roster grouped by
+category, with image readiness. The Settings page views and sets the VirusTotal
+and ESET credentials (masked).
 
-- **Scans** list, upload, and drill into any scan (verdict, file + hashes, per-engine grid).
-- **Engines** the full engine roster grouped by category.
-- **Settings** view and set the VirusTotal and ESET credentials.
+![Scans list](docs/screenshots/scans.png)
+
+![Engine roster](docs/screenshots/engines.png)
+
+![Settings](docs/screenshots/settings.png)
 
 ## Development
 

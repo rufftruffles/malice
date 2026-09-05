@@ -10,7 +10,7 @@ Revival of the abandoned maliceio/malice project (last release 2019).
 - Docker client: v17.10 SDK to Docker SDK 29 (moby/moby client + docker/cli 29)
 - Backend: Elasticsearch 6.5 to Elasticsearch 8 (official Go client; same `malice`
   index and document shape)
-- Removed dead code: the api/ tree, the 2016 React skeleton, docker/machine, the
+- Removed dead code: the 2016 React skeleton, docker/machine, the
   elk command
 
 ### Engines

@@ -1,5 +1,5 @@
 /* ============================================================
-   Malice SPA — vanilla JS, hash router, no framework.
+   Malice SPA: vanilla JS, hash router, no framework.
    ============================================================ */
 "use strict";
 
@@ -120,7 +120,7 @@ function detectionLabel(name, res) {
   else if (["infected", "threat", "malicious"].includes(res.status)) d = res.status;
   if (d == null) d = "flagged";
   if (typeof d === "object") d = JSON.stringify(d);
-  // maldet reports hash-rule hits as "{SHA256}sig.name" — render as "sig.name (SHA256 match)"
+  // maldet reports hash-rule hits as "{SHA256}sig.name"; render as "sig.name (SHA256 match)"
   const m = String(d).match(/^\{([A-Za-z0-9]+)\}(.+)$/);
   if (m) d = m[2] + " (" + m[1] + " match)";
   d = String(d).replace(/\s+/g, " ").trim();
@@ -145,7 +145,7 @@ async function copyText(txt) {
 /* ---------- Verdict ---------- */
 function verdictOf(scan) {
   // While a scan is still in flight (in state.active, not yet settled) show the
-  // animated "Scanning" badge so users know the results aren't final yet — this
+  // animated "Scanning" badge so users know the results aren't final yet; this
   // takes precedence over an early "threat" so a mid-scan detection doesn't look
   // like a finished verdict. Once settled the entry leaves state.active and the
   // final threat/clean verdict shows.
@@ -505,7 +505,7 @@ async function renderSettings() {
         <label class="field-label" for="key-${name}">${label}</label>
         <div class="field-row">
           <input class="field-input mono" id="key-${name}" type="password" spellcheck="false"
-            placeholder="${cur ? "Set — " + esc(cur) + " (leave blank to keep)" : "Not set"}" value="">
+            placeholder="${cur ? "Set " + esc(cur) + " (leave blank to keep)" : "Not set"}" value="">
           <button type="button" class="btn field-clear" data-clear="${name}" ${cur ? "" : "disabled"}>Clear</button>
         </div>
         <div class="field-hint">${hint}</div>
@@ -600,7 +600,7 @@ function ensurePolling() {
   if (state.pollTimer) return;
   state.pollTimer = setInterval(async () => {
     if (state.active.size === 0) { clearInterval(state.pollTimer); state.pollTimer = null; return; }
-    // mark stable/timeout. On timeout set 99 so the entry is removed below —
+    // mark stable/timeout. On timeout set 99 so the entry is removed below;
     // previously it set stable=1, which never reached the 99 the removal checks,
     // so a scan absent from the list (ES down at upload, failed write, deleted)
     // kept polling /api/scans every 2.5s forever.
@@ -619,7 +619,7 @@ function ensurePolling() {
         a.stable = (a.stable || 0) + 1;
         // Settle only after a quiet window AND a minimum elapsed time. Engines
         // report in bursts, and the slowest (eset's on-demand AV scan) can report
-        // ~50-60s in, so the old 3-poll (7.5s) window — and even a 30s minimum —
+        // ~50-60s in, so the old 3-poll (7.5s) window, and even a 30s minimum,
         // settled mid-scan and froze the detection count at a partial value (it
         // only corrected on a hard refresh, e.g. 5/17 instead of the final 6/17).
         // Require 20s of quiet AND 75s elapsed so every engine, including slow
