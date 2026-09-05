@@ -43,6 +43,8 @@ func cmdLookUp(hash string, logs bool) error {
 	// Initialize the malice database
 	es.Init()
 
+	es.Plugins = database.GetPluginsByCategory()
+
 	if plugins.InstalledPluginsCheck(docker) {
 		log.Debug("All enabled plugins are installed.")
 	} else {
