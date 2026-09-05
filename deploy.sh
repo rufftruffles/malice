@@ -58,7 +58,19 @@ echo "   ok"
 # ---- 2. docker -------------------------------------------------------------
 if ! command -v docker >/dev/null 2>&1; then
     echo "== installing docker"
-    curl -fsSL https://get.docker.com | sh
+    if command -v apt-get >/dev/null 2>&1; then
+        # Debian/Ubuntu: Docker's official script handles apt
+        curl -fsSL https://get.docker.com | sh
+    elif command -v dnf >/dev/null 2>&1; then
+        # RHEL-family (AlmaLinux, Rocky, CentOS, Fedora): get.docker.com does
+        # not recognize almalinux, so add the official docker-ce repo directly.
+        dnf install -y dnf-utils
+        dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    else
+        echo "could not detect a supported package manager (need apt-get or dnf)."
+        exit 1
+    fi
     systemctl enable --now docker
 else
     echo "== docker present: $(docker --version)"
@@ -68,6 +80,22 @@ if ! docker compose version >/dev/null 2>&1; then
     exit 1
 fi
 systemctl is-active docker >/dev/null || systemctl start docker
+# Verify the daemon actually came up. A fresh RHEL-family host may be missing
+# the netfilter kernel modules Docker needs for bridge networking.
+if ! docker info >/dev/null 2>&1; then
+    echo
+    echo "docker is installed but the daemon is not running."
+    if ! ls /lib/modules/$(uname -r)/kernel/net/netfilter/xt_addrtype.ko* >/dev/null 2>&1; then
+        echo "Likely cause: the running kernel is missing the xt_addrtype netfilter"
+        echo "module Docker needs for bridge networking. On RHEL-family hosts it"
+        echo "ships in kernel-modules-extra. Fix:"
+        echo "    dnf install kernel-modules-extra && reboot"
+        echo "then re-run ./deploy.sh"
+    else
+        echo "Diagnose with: journalctl -xeu docker.service"
+    fi
+    exit 1
+fi
 
 # ---- 3. pull images --------------------------------------------------------
 pull_and_tag() {
