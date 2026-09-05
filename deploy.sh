@@ -7,7 +7,7 @@
 #   3. pulls the server, all 17 engine images, and Elasticsearch from GHCR,
 #      and retags the engines to the names the server expects (malice/<name>)
 #   4. starts the stack with docker compose
-#   5. opens port 3993 in ufw if the firewall is active
+#   5. opens port 3993 in the active firewall (ufw or firewalld)
 #   6. prints the URL
 #
 # It also installs a daily systemd timer that re-pulls the four
@@ -92,12 +92,19 @@ docker compose up -d
 docker compose ps
 
 # ---- 5. firewall -----------------------------------------------------------
+fw_opened=0
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | head -1 | grep -q "Status: active"; then
     echo "== opening port $PORT in ufw"
     ufw allow "$PORT/tcp" >/dev/null
-else
-    echo "== no active ufw firewall, skipping"
+    fw_opened=1
 fi
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state 2>/dev/null | grep -q running; then
+    echo "== opening port $PORT in firewalld"
+    firewall-cmd --permanent --add-port="$PORT/tcp" >/dev/null
+    firewall-cmd --reload >/dev/null
+    fw_opened=1
+fi
+[ "$fw_opened" = "1" ] || echo "== no active firewall (ufw or firewalld), skipping"
 
 # ---- 6. daily image refresh timer ------------------------------------------
 echo "== installing daily image refresh timer"
