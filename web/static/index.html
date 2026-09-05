@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Malice — Multi-Engine Malware Scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23059669' stroke-width='2'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/scans" aria-label="Malice home">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+      <span class="wordmark">MALICE</span>
+      <span class="brand-sub">multi-engine scanner</span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="#/scans" data-nav="scans">Scans</a>
+      <a href="#/engines" data-nav="engines">Engines</a>
+    </nav>
+    <div class="status" id="health" title="Backend status">
+      <span class="status-item"><span class="dot" id="es-dot"></span><span id="es-label">ES</span></span>
+      <span class="status-sep" aria-hidden="true"></span>
+      <span class="status-item" id="engine-count">— engines</span>
+    </div>
+  </header>
+
+  <main id="view" class="view" aria-live="polite"></main>
+
+  <footer class="footer">
+    <span>Malice</span>
+    <span class="footer-sep" aria-hidden="true"></span>
+    <span id="footer-version"></span>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="assertive" hidden></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

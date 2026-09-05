@@ -125,6 +125,18 @@ var Commands = []*cli.Command{
 			}
 		},
 	},
+{
+	Name:      "serve",
+	Usage:     "Start the Malice web UI + REST API",
+	Flags: []cli.Flag{
+		&cli.IntFlag{
+			Name:  "port",
+			Value: 3993,
+			Usage: "Port to listen on (bound to 0.0.0.0)",
+		},
+	},
+	Action: func(c *cli.Context) error { return cmdServe(c) },
+},
 }
 
 // CmdNotFound outputs a formatted command not found message
