@@ -1,10 +1,12 @@
 #!/bin/sh
-# malice-update: nightly refresh of signature-decaying engine images.
+# malice-update: manual refresh of signature-decaying engine images.
 #
 # Rebuilds the engines whose value decays between builds (AV signatures and
 # rule sets are fetched at build time) and, when MALICE_REGISTRY is set and
 # docker is logged in, pushes them so client deployments pick them up with a
 # plain `docker pull`.
+# The nightly refresh runs in GitHub Actions on the engine repos
+# (.github/workflows/build.yml); this script is for local or manual rebuilds.
 #
 # Engines refreshed:
 #   clamav  - freshclam signatures (fetched at build time)

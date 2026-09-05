@@ -101,7 +101,7 @@ docker compose up -d
 - **ESET** refreshes its signatures on every scan: the engine entrypoint runs
   `upd -u` at container start. No rebuild needed.
 - **clamav, kvrt, yara, lmd** fetch their signature and rule sets at build time, so
-  they are rebuilt nightly on the build host and pushed to GHCR. A client that ran
+  they are rebuilt nightly by GitHub Actions on their engine repos and pushed to GHCR. A client that ran
   `deploy.sh` picks them up automatically: a systemd timer re-pulls those four images
   daily at 04:52.
 - The remaining engines are static tools with no decaying state.

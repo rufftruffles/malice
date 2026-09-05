@@ -12,7 +12,7 @@
 #
 # It also installs a daily systemd timer that re-pulls the four
 # signature-decaying engine images (clamav, kvrt, yara, lmd). Those are
-# rebuilt nightly on the build host; the timer keeps a client current with
+# rebuilt nightly by GitHub Actions; the timer keeps a client current with
 # a plain pull. ESET is not in the list: its entrypoint refreshes signatures
 # on every scan.
 #

@@ -37,6 +37,8 @@ Revival of the abandoned maliceio/malice project (last release 2019).
 - `deploy.sh`: one-command deployment (spec check, Docker install, image pull,
   compose up, firewall, URL)
 - `docker-compose.yml`: Elasticsearch 8 + server
-- Nightly rebuild of the signature-decaying engines (clamav, kvrt, yara, lmd) with
+- Nightly rebuild of the signature-decaying engines (clamav, kvrt, yara, lmd) via GitHub Actions with
   push to GHCR; client-side daily image refresh timer
 - Engine images published to GHCR as `ghcr.io/rufftruffles/malice-<engine>`
+- GitHub Actions build pipeline: every repo builds and pushes its image on tag;
+  the four decaying engines also rebuild nightly (22:17 UTC)
