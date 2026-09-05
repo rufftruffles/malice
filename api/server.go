@@ -370,7 +370,7 @@ func summarizeScan(raw json.RawMessage) map[string]interface{} {
 	// have no mime_type; for those the client falls back to the total.
 	expected := 0
 	if mime, _ := doc.File["mime_type"].(string); mime != "" {
-		expected = len(plugins.GetPluginsForMime(mime, true))
+		expected = len(plugins.ScanPlugins(mime, true))
 	}
 	return map[string]interface{}{
 		"file":             doc.File,

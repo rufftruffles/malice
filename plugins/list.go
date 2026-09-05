@@ -95,6 +95,33 @@ func GetPluginsForMime(mime string, enabled bool) []Plugin {
 	return getMime(mime, getInstalled())
 }
 
+// ScanPlugins returns the union of the MIME-applicable plugins and the
+// intel plugins. This is exactly the set of engines scanRun fans out to
+// for a file with the given MIME type, so its length is the correct
+// denominator for scan progress ("N of M engines reported"). Intel plugins
+// run unconditionally (their mime is "hash", which never matches a file
+// MIME), so the two sets are disjoint in practice; the seen map guards
+// against any overlap.
+func ScanPlugins(mime string, enabled bool) []Plugin {
+	seen := map[string]bool{}
+	out := []Plugin{}
+	add := func(p Plugin) {
+		if !seen[p.Name] {
+			seen[p.Name] = true
+			out = append(out, p)
+		}
+	}
+	for _, p := range GetPluginsForMime(mime, enabled) {
+		add(p)
+	}
+	// scanRun passes the file SHA1 to RunIntelPlugins; GetIntelPlugins's
+	// hashType filter is currently disabled, so the value is a no-op today.
+	for _, p := range GetIntelPlugins("sha1", enabled) {
+		add(p)
+	}
+	return out
+}
+
 func getIntel(plugins []Plugin) []Plugin {
 	intel := []Plugin{}
 	if plugins == nil {

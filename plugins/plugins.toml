@@ -137,7 +137,7 @@ title = "Malice Plugin Configurations"
   image = "malice/capa"
   repository = "https://github.com/malice-plugins/capa.git"
   build = false
-  mime = "*"
+  mime = "application/x-dosexec, application/x-executable, application/x-elf, application/x-mach-binary"
 
 [[plugin]]
   enabled = true
