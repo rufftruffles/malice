@@ -8,6 +8,8 @@ services:
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     volumes:
       - es_data:/usr/share/elasticsearch/data
+    networks:
+      - malice-net
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
@@ -25,14 +27,20 @@ services:
     environment:
       - MALICE_ELASTICSEARCH_URL=http://elasticsearch:9200
       - MALICE_ELASTICSEARCH_INDEX=malice
+      - MALICE_DOCKER_NETWORK=malice-net
     ports:
       - "3993:3993"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - malice-net
     depends_on:
       elasticsearch:
         condition: service_healthy
     restart: unless-stopped
+
+networks:
+  malice-net:
 
 volumes:
   es_data:

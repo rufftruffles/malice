@@ -47,6 +47,9 @@ func Start(
 			Privileged:   false,
 		}
 		networkingConfig := &network.NetworkingConfig{}
+		if net := os.Getenv("MALICE_DOCKER_NETWORK"); net != "" {
+			networkingConfig.EndpointsConfig = map[string]*network.EndpointSettings{net: {}}
+		}
 
 		contResponse, err := docker.Client.ContainerCreate(context.Background(), apiclient.ContainerCreateOptions{
 			Config:           createContConf,
