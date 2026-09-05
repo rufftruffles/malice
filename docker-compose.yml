@@ -17,6 +17,7 @@ services:
     restart: unless-stopped
 
   malice:
+    image: malice/malice:1.0.0
     build:
       context: ..
       dockerfile: malice/Dockerfile

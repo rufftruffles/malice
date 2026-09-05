@@ -3,9 +3,8 @@
 # ---- Build stage ----
 FROM golang:1.27 AS build
 WORKDIR /src
-# go.mod pins github.com/malice-plugins/pkgs to a local sibling (../malice-plugins),
-# so both repos must be present in the build context (the parent directory).
-COPY malice-plugins/ /src/malice-plugins/
+# pkgs is resolved at build time via the go.mod replace
+# (github.com/rufftruffles/malice-plugins), so only this repo is copied.
 COPY malice/ /src/malice/
 WORKDIR /src/malice
 RUN go mod download
