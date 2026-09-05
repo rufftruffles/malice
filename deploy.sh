@@ -2,7 +2,7 @@
 # deploy.sh - one-shot deployment of the malice multi-engine scanner.
 #
 # What it does:
-#   1. checks the host meets the minimum spec (4 cores, 8 GB RAM, 100 GB free)
+#   1. checks the host meets the minimum spec (4 cores, 8 GB RAM, 80 GB free)
 #   2. installs Docker + the compose plugin if missing
 #   3. pulls the server, all 17 engine images, and Elasticsearch from GHCR,
 #      and retags the engines to the names the server expects (malice/<name>)
