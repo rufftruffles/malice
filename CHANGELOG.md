@@ -1,56 +1,42 @@
-Change Log
-==========
+# Changelog
 
-All notable changes to this project will be documented in this file.
+## 1.0.0 (2026-09-05)
 
-[latest]
---------
+Revival of the abandoned maliceio/malice project (last release 2019).
 
-### Fixed
+### Core
 
-### Added
+- Build system: Dep (dead) to Go modules, Go 1.26+
+- Docker client: v17.10 SDK to Docker SDK 29 (moby/moby client + docker/cli 29)
+- Backend: Elasticsearch 6.5 to Elasticsearch 8 (official Go client; same `malice`
+  index and document shape)
+- Removed dead code: the api/ tree, the 2016 React skeleton, docker/machine, the
+  elk command
 
-### Removed
+### Engines
 
-### Changed
+- 17 engines rebuilt from source and verified end to end
+- Dropped 14 commercial AV engines from the original roster; none offers a free
+  Linux CLI anymore
+- Added: CAPA, DIE, rizin, CIRCL hashlookup, Kaspersky KVRT, Linux Malware Detect,
+  ESET EEA 13.2
+- Rebuilt: ClamAV, YARA (yara-x), FLOSS 3.x, pescan (Authenticode via pefile +
+  asn1crypto), office (oletools), pdf (pdfid + pdf-parser), NSRL (RDSv3 SQLite)
+- VirusTotal: v3 API, opt-in key (the hardcoded key is gone)
+- ESET: on-demand scan (odscan), opt-in license, signatures refreshed on every scan
 
-[v0.2.0] - 2016-10-08
----------------------
+### Web + API
 
-### Fixed
+- New web UI: scans, engines, settings
+- REST API: `/api/scans`, `/api/plugins`, `/api/settings`, `/api/health`
+- Settings page for the VirusTotal and ESET credentials (0600 file store, masked
+  display, values never logged)
 
-### Added
+### Deploy + updates
 
--	added support for ElasticSearch through use of **blacktop/elk**
--	add zip plugin place holder
--	add nsrl lookup plugin
--	add totalhash lookup plugin
--	Docs !!!
--	release binaries
-
-### Removed
-
--	support for RethinkDB
-
-### Changed
-
--	upgrade to the elastic stack 5.0.0
-
-[v0.1.0] - 2016-08-14
----------------------
-
-### Fixed
-
--	improved zsh completions to include new features
-
-### Added
-
--	added the ability to watch a folder for new files and then scan them with the `watch` subcommand
--	added ability to update plugin/all plugins from source with the `--source` flag
--	ability to mark plugins as build from source only in `plugins/plugins.toml` config file
--	tini
--	gosu
-
-### Removed
-
-### Changed
+- `deploy.sh`: one-command deployment (spec check, Docker install, image pull,
+  compose up, firewall, URL)
+- `docker-compose.yml`: Elasticsearch 8 + server
+- Nightly rebuild of the signature-decaying engines (clamav, kvrt, yara, lmd) with
+  push to GHCR; client-side daily image refresh timer
+- Engine images published to GHCR as `ghcr.io/rufftruffles/malice-<engine>`
