@@ -16,17 +16,15 @@ import (
 
 // Configuration represents the malice runtime configuration.
 type Configuration struct {
-	Title       string              `toml:"title"`
-	Version     string              `toml:"version"`
-	Author      authorInfo          `toml:"author"`
-	Web         webConfig           `toml:"web"`
-	Email       emailConfig         `toml:"email"`
-	DB          databaseConfig      `toml:"database"`
-	UI          userInterfaceConfig `toml:"ui"`
-	Environment envConfig           `toml:"environment"`
-	Docker      dockerConfig        `toml:"docker"`
-	Logger      loggerConfig        `toml:"logger"`
-	Proxy       proxyConfig         `toml:"proxy"`
+	Title       string         `toml:"title"`
+	Version     string         `toml:"version"`
+	Author      authorInfo     `toml:"author"`
+	Web         webConfig      `toml:"web"`
+	DB          databaseConfig `toml:"database"`
+	Environment envConfig      `toml:"environment"`
+	Docker      dockerConfig   `toml:"docker"`
+	Logger      loggerConfig   `toml:"logger"`
+	Proxy       proxyConfig    `toml:"proxy"`
 }
 
 type authorInfo struct {
@@ -39,14 +37,6 @@ type webConfig struct {
 	AdminURL string `toml:"admin_url"`
 }
 
-type userInterfaceConfig struct {
-	Name    string `toml:"name"`
-	Image   string `toml:"image"`
-	Server  string `toml:"server"`
-	Ports   []int  `toml:"ports"`
-	Enabled bool   `toml:"enabled"`
-}
-
 type databaseConfig struct {
 	Name     string `toml:"name"`
 	Image    string `toml:"image"`
@@ -56,13 +46,6 @@ type databaseConfig struct {
 	Ports    []int  `toml:"ports"`
 	Timeout  int    `toml:"timeout"`
 	Enabled  bool   `toml:"enabled"`
-}
-
-type emailConfig struct {
-	Host     string `toml:"host"`
-	Port     int    `toml:"port"`
-	Username string `toml:"user"`
-	Password string `toml:"pass"`
 }
 
 type envConfig struct {

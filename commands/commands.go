@@ -57,18 +57,6 @@ var Commands = []*cli.Command{
 		},
 	},
 	{
-		Name:        "elk",
-		Usage:       "Start the ELK docker container",
-		Description: "This ELK container will attach to the ElasticSearch data for all previous malice scans.",
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "logs",
-				Usage: "Display the Logs from the ELK Container",
-			},
-		},
-		Action: func(c *cli.Context) error { return cmdELK(c.Bool("logs")) },
-	},
-	{
 		Name:  "plugin",
 		Usage: "List, Install or Remove Plugins",
 		Subcommands: []*cli.Command{
@@ -125,18 +113,18 @@ var Commands = []*cli.Command{
 			}
 		},
 	},
-{
-	Name:      "serve",
-	Usage:     "Start the Malice web UI + REST API",
-	Flags: []cli.Flag{
-		&cli.IntFlag{
-			Name:  "port",
-			Value: 3993,
-			Usage: "Port to listen on (bound to 0.0.0.0)",
+	{
+		Name:  "serve",
+		Usage: "Start the Malice web UI + REST API",
+		Flags: []cli.Flag{
+			&cli.IntFlag{
+				Name:  "port",
+				Value: 3993,
+				Usage: "Port to listen on (bound to 0.0.0.0)",
+			},
 		},
+		Action: func(c *cli.Context) error { return cmdServe(c) },
 	},
-	Action: func(c *cli.Context) error { return cmdServe(c) },
-},
 }
 
 // CmdNotFound outputs a formatted command not found message

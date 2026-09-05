@@ -16,12 +16,6 @@ version = "v0.3.28"
   url = "0.0.0.0:80"
   admin_url = "127.0.0.1:3333"
 
-[email]
-  host = "smtp.example.com"
-  port = 25
-  user = "username"
-  pass = "password"
-
 [database]
   name = "malice-elastic"
   image = "docker.elastic.co/elasticsearch/elasticsearch:8.19.20"
@@ -31,13 +25,6 @@ version = "v0.3.28"
   password = ""
   ports = [9200]
   timeout = 20
-  enabled = true
-
-[ui]
-  name = "malice-kibana"
-  image = "docker.elastic.co/kibana/kibana:8.19.20"
-  server = "localhost"
-  ports = [443]
   enabled = true
 
 [environment]

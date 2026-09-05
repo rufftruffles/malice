@@ -154,7 +154,7 @@ func InstallPlugin(plugin *Plugin) (err error) {
 
 	var newPlugin = Configuration{
 		[]Plugin{
-			Plugin{
+			{
 				Name:        plugin.Name,
 				Enabled:     plugin.Enabled,
 				Category:    plugin.Category,

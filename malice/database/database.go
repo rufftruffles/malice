@@ -44,11 +44,11 @@ func Start(docker *client.Docker, es elasticsearch.Database, logs bool) error {
 
 	if docker.Ping() {
 		esContainer, err := container.Start(docker, nil, name, image, logs, binds, portBindings, nil,
-		[]string{
-			// ES 8 single-node dev setup: no auth, no cluster formation
-			"discovery.type=single-node",
-			"xpack.security.enabled=false",
-		})
+			[]string{
+				// ES 8 single-node dev setup: no auth, no cluster formation
+				"discovery.type=single-node",
+				"xpack.security.enabled=false",
+			})
 		if err != nil {
 			return errors.Wrap(err, "failed to start docker container")
 		}

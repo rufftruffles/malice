@@ -3,99 +3,44 @@ NAME=engine
 VERSION=$(shell cat .release/VERSION)
 MESSAGE?="New release"
 
-# TODO remove \|/templates/\|/api
-SOURCE_FILES?=$$(go list ./... | grep -v '/vendor/\|/templates/\|/api')
+# Packages to test (everything except vendor).
+SOURCE_FILES?=$$(go list ./... | grep -v /vendor/)
 TEST_PATTERN?=.
 TEST_OPTIONS?=
 
-GIT_COMMIT=$(git rev-parse HEAD)
+GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo none)
 GIT_DIRTY=$(test -n "`git status --porcelain`" && echo "+CHANGES" || true)
-GIT_DESCRIBE=$(git describe --tags)
+GIT_DESCRIBE=$(git describe --tags --always 2>/dev/null || echo none)
 
+.PHONY: bindata build test fmt lint ci help
 
-bindata: ## Embed binary data in malice program
+bindata: ## Embed binary data (config + plugins toml) into the binary
 	@echo "===> Embedding Binary Data"
-	# tomlupdate --path config/config.toml $(VERSION)
 	rm -f config/bindata.go plugins/bindata.go
 	go-bindata -pkg config -ignore=load.go config/...
 	mv bindata.go config/bindata.go
-	go-bindata -pkg plugins -ignore="^.*.go|\\.DS_Store" plugins/...
+	go-bindata -pkg plugins -ignore="^.*.go|\.DS_Store" plugins/...
 	mv bindata.go plugins/bindata.go
 
-docker: ## Build docker image
-	cd .docker; docker build --build-arg VERSION=$(VERSION) -t $(REPO)/$(NAME):$(VERSION) .
-
-size: docker ## Add docker image size to READMEs
-	sed -i.bu 's/docker%20image-.*-blue/docker%20image-$(shell docker images --format "{{.Size}}" $(REPO)/$(NAME):$(VERSION)| cut -d' ' -f1)%20MB-blue/' README.md
-	sed -i.bu 's/docker%20image-.*-blue/docker%20image-$(shell docker images --format "{{.Size}}" $(REPO)/$(NAME):$(VERSION)| cut -d' ' -f1)%20MB-blue/' .docker/README.md
-
-osx: ## Install OSX dev dependencies
-	brew tap homebrew/bundle
-	brew bundle
-	gem install --no-ri --no-rdoc fpm
-
-# TODO switch to golang/dep
-setup: ## Install all the build and lint dependencies
-	@echo "===> Installing deps"
-	go get -u github.com/jteeuwen/go-bindata/...
-	go get -u github.com/kardianos/govendor
-	go get -u golang.org/x/tools/cmd/cover
-	go get -u github.com/golang/dep/cmd/dep
-	go get -u github.com/maliceio/malice/utils/tomlupdate
-	govendor sync
+build: bindata ## Build the malice binary (malice-bin)
+	@echo "===> Building $(NAME) ($(VERSION))"
+	go build -buildvcs=false -ldflags "-X main.version=$(VERSION) -X main.commit=$(GIT_COMMIT) -X main.date=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)" -o malice-bin .
 
 test: ## Run all the tests
 	@echo "===> Running Tests"
-	echo 'mode: atomic' > coverage.tmp
-	$(SOURCE_FILES) | xargs -n1 -I{} sh -c 'go test -covermode=atomic -coverprofile=coverage.tmp {} && tail -n +2 coverage.tmp >> coverage.txt' && rm coverage.tmp
+	go test $(TEST_OPTIONS) -cover $(SOURCE_FILES)
 
-cover: test ## Run all the tests and opens the coverage report
-	@echo "===> Running Cover"
-	go tool cover -html=coverage.txt
-
-fmt: ## gofmt and goimports all go files
+fmt: ## gofmt all go files
 	@echo "===> Formatting Go Files"
-	find . -name '*.go' -not -wholename './vendor/*' | while read -r file; do gofmt -w -s "$$file"; goimports -w "$$file"; done
+	find . -name "*.go" -not -path "./vendor/*" -not -name "bindata.go" -print0 | xargs -0 gofmt -w -s
 
-lint: ## Run all the linters
-	@echo "===> Lintting"
-	gometalinter --vendor --disable-all \
-		--enable=deadcode \
-		--enable=ineffassign \
-		--enable=gosimple \
-		--enable=staticcheck \
-		--enable=gofmt \
-		--enable=goimports \
-		--enable=dupl \
-		--enable=misspell \
-		--enable=errcheck \
-		--enable=vet \
-		--enable=vetshadow \
-		--deadline=10m \
-		./...
-	markdownfmt -w README.md
-	markdownfmt -w CHANGELOG.md
-	markdownfmt -w .release/RELEASE.md
-
-build: bindata
-	goreleaser --skip-publish --rm-dist --skip-validate
-
-release: ## Create a new release from the VERSION
-	@echo "===> Creating Release"
-	git tag -a $(VERSION) -m ${MESSAGE}
-	git push origin $(VERSION)
-	# goreleaser --release-notes .release/RELEASE.md
-	goreleaser --rm-dist
-
-destroy: ## Remove release from the VERSION
-	@echo "===> Deleting Release"
-	rm -rf dist
-	git tag -d $(VERSION)
-	git push origin :refs/tags/$(VERSION)
+lint: ## Static checks (go vet + gofmt)
+	@echo "===> Linting"
+	go vet ./...
+	@bad=$$(gofmt -l . | grep -v bindata.go); if [ -n "$$bad" ]; then echo "gofmt needed on:"; echo "$$bad"; exit 1; fi
 
 ci: lint test ## Run all the tests and code checks
 
-# Absolutely awesome: http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 

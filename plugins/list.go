@@ -108,15 +108,11 @@ func getIntel(plugins []Plugin) []Plugin {
 	return intel
 }
 
-// getInstalled returns a map[string]plugin of installed plugins
+// getInstalled returns the plugins available to run. The Installed flag is
+// not tracked (setInstalledFlag is disabled), so all configured plugins are
+// returned; InstalledPluginsCheck performs the real docker presence check.
 func getInstalled() []Plugin {
-	installed := []Plugin{}
-	for _, plugin := range Plugs.Plugins {
-		if plugin.Installed {
-			installed = append(installed, plugin)
-		}
-	}
-	return installed
+	return Plugs.Plugins
 }
 
 // GetCategories returns all categories
@@ -167,7 +163,7 @@ func getEnabled(plugins []Plugin) []Plugin {
 	if plugins == nil {
 		return Plugs.Plugins
 	}
-	for _, plugin := range Plugs.Plugins {
+	for _, plugin := range plugins {
 		if plugin.Enabled {
 			enabled = append(enabled, plugin)
 		}

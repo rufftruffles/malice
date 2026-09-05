@@ -40,8 +40,8 @@ type File struct {
 	Name string `json:"name,omitempty" structs:"name"`
 	Path string `json:"path,omitempty" structs:"path"`
 	// Valid bool   `json:"valid"`
-	SizeBytes int64 `json:"size,omitempty" structs:"size"`
-	Size string `json:"size_human,omitempty" structs:"size_human"`
+	SizeBytes int64  `json:"size,omitempty" structs:"size"`
+	Size      string `json:"size_human,omitempty" structs:"size_human"`
 	// CRC32  string
 	MD5    string `json:"md5,omitempty" structs:"md5"`
 	SHA1   string `json:"sha1,omitempty" structs:"sha1"`
