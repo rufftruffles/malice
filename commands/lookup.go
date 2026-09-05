@@ -22,7 +22,6 @@ func cmdLookUp(hash string, logs bool) error {
 	elasticsearchInDocker := false
 	es := elasticsearch.Database{
 		Index:    utils.Getopt("MALICE_ELASTICSEARCH_INDEX", "malice"),
-		Type:     utils.Getopt("MALICE_ELASTICSEARCH_TYPE", "samples"),
 		URL:      utils.Getopt("MALICE_ELASTICSEARCH_URL", config.Conf.DB.URL),
 		Username: utils.Getopt("MALICE_ELASTICSEARCH_USERNAME", config.Conf.DB.Username),
 		Password: utils.Getopt("MALICE_ELASTICSEARCH_PASSWORD", config.Conf.DB.Password),
