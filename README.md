@@ -1,152 +1,117 @@
-![malice logo](https://raw.githubusercontent.com/maliceio/malice/master/docs/images/logo/malice.png)
+# Malice
 
-# malice
+> A free, open-source, multi-engine malware scanner. Malice orchestrates a fleet of
+> antivirus and analysis engines in Docker, runs them all against a single file, and
+> stores the combined results in Elasticsearch — a self-hosted VirusTotal.
 
-[![Circle CI](https://circleci.com/gh/maliceio/malice.png?style=shield)](https://circleci.com/gh/maliceio/malice) [![License](https://img.shields.io/badge/licence-Apache%202.0-blue.svg)](LICENSE) [![Release](https://img.shields.io/github/release/maliceio/malice.svg)](https://github.com/gmaliceio/malice/releases/latest) [![bh-arsenal](https://github.com/toolswatch/badges/blob/master/arsenal/usa/2018.svg)](https://www.blackhat.com/us-18/arsenal/schedule/index.html#maliceio-12000) [![Gitter](https://badges.gitter.im/maliceio/malice.svg)](https://gitter.im/maliceio/malice)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> Malice's mission is to be a free open source version of VirusTotal that anyone can use at any scale from an independent researcher to a fortune 500 company.
+## Why
 
----
+Malice is a free, open-source alternative to VirusTotal that anyone can run at any
+scale — from an independent researcher to a security team — without sending files to a
+third party.
 
-## Try It Out
+## How it works
 
-> **DEMO:** [demo.malice.io](<https://demo.malice.io/app/kibana#/discover?_g=(refreshInterval:(pause:!t,value:0),time:(from:'2018-09-03T04:00:00.000Z',mode:absolute,to:'2018-09-10T04:00:00.000Z'))&_a=(columns:!(_source),index:afe16d30-b234-11e8-84d2-4fddc6da27ff,interval:auto,query:(language:lucene,query:''),sort:!(scan_date,desc))>)
+Malice is a thin Go client. It does not run any AV engine itself. For each file it:
 
-- **username**: `malice`
-- **password**: `ecilam`
+1. Hashes the file (MD5 / SHA-1 / SHA-256 / SHA-512).
+2. Copies it into a Docker volume.
+3. Runs every enabled engine that supports the file MIME type as an isolated Docker
+   container, plus a set of hash-lookup "intel" engines.
+4. Collects each engine JSON result and stores one scan document in Elasticsearch.
 
-## Requirements
+The result is one document per file: file metadata + hashes, and a per-engine result tree.
 
-### Hardware
+## Engines
 
-- ~16GB disk space
-- ~4GB RAM
+17 engines across 6 categories:
 
-### Software
+| Category   | Engine        | What it does |
+|------------|---------------|--------------|
+| av         | capa          | CAPA — capability detection (mandiant/capa) |
+| av         | clamav        | ClamAV |
+| av         | eset          | ESET Endpoint Antivirus (EEA) on-demand scan |
+| av         | kvrt          | Kaspersky Virus Removal Tool (Linux) |
+| av         | lmd           | Linux Malware Detect (signature-based) |
+| av         | yara          | YARA rule scan |
+| document   | office        | Triage OLE/RTF documents |
+| document   | pdf           | Triage PDF documents |
+| exe        | diec          | Detect-It-Easy — file type + packer/protector ID |
+| exe        | floss         | FireEye FLOSS — obfuscated string solver |
+| exe        | pescan        | Triage portable executables (PE) |
+| exe        | rizin         | rizin (rz-bin) — headers, sections, imports, exports, strings |
+| intel      | hashlookup    | CIRCL hashlookup — NSRL/known-file lookup |
+| intel      | nsrl          | NSRL database hash search |
+| intel      | shadow-server | ShadowServer hash lookup |
+| intel      | virustotal    | VirusTotal file scan + hash lookup (needs API key) |
+| metadata   | fileinfo      | ssdeep / TRiD / exiftool |
 
-- [Docker](https://docs.docker.com)
+AV engines report a positive detection; `intel` engines report whether the hash is known;
+`document` / `exe` / `metadata` engines report analysis, not a threat verdict.
 
-## Getting Started (OSX)
-
-### Install
-
-```bash
-$ brew install maliceio/tap/malice
-```
-
-```
-Usage: malice [OPTIONS] COMMAND [arg...]
-
-Open Source Malware Analysis Framework
-
-Version: 0.3.11
-
-Author:
-  blacktop - <https://github.com/blacktop>
-
-Options:
-  --debug, -D      Enable debug mode [$MALICE_DEBUG]
-  --help, -h       show help
-  --version, -v    print the version
-
-Commands:
-  scan        Scan a file
-  watch        Watch a folder
-  lookup    Look up a file hash
-  elk        Start an ELK docker container
-  plugin    List, Install or Remove Plugins
-  help        Shows a list of commands or help for one command
-
-Run 'malice COMMAND --help' for more information on a command.
-```
-
-### Scan some _malware_
+## Quick start (Docker Compose)
 
 ```bash
-$ malice scan evil.malware
+docker compose up -d
+# UI + API: http://localhost:3993
 ```
 
-> **NOTE:** On the first run malice will download all of it's default plugins which can take a while to complete.
+This starts Elasticsearch 8 and the Malice client. Malice pulls and runs the engine
+images on demand (the first scan of a new engine type is slower while the image downloads).
 
-Malice will output the results as a markdown table that can be piped or copied into a **results.md** that will look great on Github see [here](docs/examples/scan.md)
+> The Malice client talks to the Docker daemon to orchestrate the engine containers, so
+> the compose file mounts `/var/run/docker.sock`.
 
-### Start Malice's Web UI
+## CLI
 
 ```bash
-$ malice elk
+malice scan <file>          # scan a file with all enabled engines
+malice plugin list          # list engines
+malice plugin install <e>   # pull an engine image
+malice lookup <hash>        # run the intel engines against a hash
+malice serve --port 3993    # start the web UI + REST API
 ```
 
-> You can open the [Kibana](https://www.elastic.co/products/kibana) UI and look at the scan results here: <http://localhost> (_assuming you are using Docker for Mac_)
+## REST API
 
-![kibana-setup](docs/images/kibana-setup.png)
+| Method | Path                  | Description |
+|--------|-----------------------|-------------|
+| GET    | /api/health           | Service + ES health, engine count |
+| GET    | /api/scans?from&size  | List scans (newest first) |
+| GET    | /api/scans/:id        | Full scan document + per-engine results |
+| POST   | /api/scans            | Upload a file (multipart `file`) and start a scan |
+| GET    | /api/plugins          | List engines |
 
-- Type in **malice** as the `Index name or pattern` and click **Create**.
+## Web UI
 
-- Now click on the `Malice Tab` and **behold!!!**
+A dependency-free single-page app served at `/`:
 
-![kibana-plugin](docs/images/new-screen.png)
+- **Scans** — list, upload, and drill into any scan (verdict, file + hashes, per-engine grid).
+- **Engines** — the full engine roster grouped by category.
 
-## Getting Started (_Docker in Docker_)
-
-[![CircleCI](https://circleci.com/gh/maliceio/malice.png?style=shield)](https://circleci.com/gh/maliceio/malice) [![Docker Stars](https://img.shields.io/docker/stars/malice/engine.svg)](https://hub.docker.com/r/malice/engine/) [![Docker Pulls](https://img.shields.io/docker/pulls/malice/engine.svg)](https://hub.docker.com/r/malice/engine/) [![Docker Image](https://img.shields.io/badge/docker%20image-30.6%20MB-blue.svg)](https://hub.docker.com/r/malice/engine/)
-
-### Install/Update all Plugins
+## Development
 
 ```bash
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock malice/engine plugin update --all
+make build   # embed config + build malice-bin
+make test    # run tests
+make lint    # go vet + gofmt
+make ci      # lint + test
 ```
 
-### Scan a file
+### Building the binary
 
-```bash
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-                -v `pwd`:/malice/samples \
-                --network="host" \
-                -e MALICE_VT_API=$MALICE_VT_API \
-                malice/engine scan SAMPLE
+Malice depends on `github.com/malice-plugins/pkgs` (shared Elasticsearch + Docker
+helpers). This repository pins it to a local sibling checkout via a `go.mod` `replace`:
+
+```
+replace github.com/malice-plugins/pkgs => ../malice-plugins
 ```
 
-## Documentation
+So a build expects a `malice-plugins/` directory next to `malice/`. For a published
+release this `replace` is dropped in favor of the tagged `pkgs` module.
 
-- [Documentation](docs)
-- [Plugins](docs/plugins)
-- [Examples](docs/examples)
-- [Roadmap](docs/roadmap)
-- [Contributing](CONTRIBUTING.md)
+## License
 
-### Known Issues :warning:
-
-#### If you are having issues with `malice` connecting/writting to `elasticsearch` please see the following:
-
-I have noticed when running the new **5.0+** version of [malice/elasticsearch](https://github.com/maliceio/elasticsearch) on a linux host you need to increase the memory map areas with the following command
-
-```bash
-sudo sysctl -w vm.max_map_count=262144
-```
-
-Elasticsearch requires a **LOT** of RAM to run smoothly. You can lower it to **2GB** by running the following _(**before running a scan**)_:
-
-```bash
-$ docker run -d \
-         -p 9200:9200 \
-         --name malice-elastic \
-         -e ES_JAVA_OPTS="-Xms2g -Xmx2g" \
-         malice/elasticsearch
-```
-
-#### See here for more details on [Known Issues/FAQs](https://github.com/maliceio/malice/blob/master/docs/KnownBugs.md) :warning:
-
-### Issues
-
-Find a bug? Want more features? Find something missing in the documentation? Let me know! Please don't hesitate to [file an issue](https://github.com/maliceio/malice/issues/new)
-
-### CHANGELOG
-
-See [`CHANGELOG.md`](https://github.com/maliceio/malice/blob/master/CHANGELOG.md)
-
-### License
-
-Apache License (Version 2.0)<br>
-Copyright (c) 2013 - 2018 **blacktop**
-
- <!-- [![Slack](https://malice-slack.herokuapp.com/badge.svg)](https://malice-slack.herokuapp.com) -->
+Apache 2.0 — see [LICENSE](LICENSE).
