@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/api/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/docker/docker/api/server/httputils"
 	"github.com/docker/docker/api/server/middleware"
 	"github.com/docker/docker/api/server/router"
@@ -20,6 +19,14 @@ import (
 // versionMatcher defines a variable matcher to be parsed by the router
 // when a request is about to be served.
 const versionMatcher = "/v{version:[0-9.]+}"
+
+// notFoundError implements docker's api/errdefs.ErrNotFound interface so
+// httputils.MakeErrorHandler maps it to HTTP 404.
+type notFoundError struct{ err error }
+
+func (e notFoundError) Error() string { return e.err.Error() }
+func (e notFoundError) NotFound()     {}
+func (e notFoundError) Cause() error  { return e.err }
 
 // Config provides the configuration for the API server
 type Config struct {
@@ -176,7 +183,7 @@ func (s *Server) createMux() *mux.Router {
 		}
 	}
 
-	err := errors.NewRequestNotFoundError(fmt.Errorf("page not found"))
+	err := notFoundError{fmt.Errorf("page not found")}
 	notFoundHandler := httputils.MakeErrorHandler(err)
 	m.HandleFunc(versionMatcher+"/{path:.*}", notFoundHandler)
 	m.NotFoundHandler = notFoundHandler

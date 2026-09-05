@@ -16,20 +16,19 @@ import (
 	"github.com/docker/docker/api/types"
 	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/builder/dockerignore"
-	"github.com/docker/docker/cli/command/image/build"
+	build "github.com/maliceio/malice/malice/docker/client/buildctx"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/fileutils"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/pkg/streamformatter"
-	"github.com/docker/docker/pkg/stringutils"
 	"github.com/docker/docker/pkg/urlutil"
 	"github.com/docker/docker/registry"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // Pull pulls docker image:tag
@@ -126,7 +125,7 @@ func Build(docker *client.Docker, repository string, tags []string, buildArgs ma
 	}
 
 	// Setup an upload progress bar
-	progressOutput := streamformatter.NewStreamFormatter().NewProgressOutput(progBuff, true)
+	progressOutput := streamformatter.NewProgressOutput(progBuff)
 
 	var body io.Reader = progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
 
@@ -257,7 +256,7 @@ func Search(docker *client.Docker, term string) error {
 		desc := strings.Replace(res.Description, "\n", " ", -1)
 		desc = strings.Replace(desc, "\r", " ", -1)
 		if !opts.noTrunc && len(desc) > 45 {
-			desc = stringutils.Truncate(desc, 42) + "..."
+			desc = desc[:42] + "..."
 		}
 		fmt.Fprintf(w, "%s\t%s\t%d\t", res.Name, desc, res.StarCount)
 		if res.IsOfficial {

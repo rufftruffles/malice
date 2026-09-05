@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/docker/docker/client"
 	"github.com/malice-plugins/pkgs/utils"
 	"github.com/maliceio/malice/config"
@@ -108,7 +108,7 @@ func handleClientError(dockerError error) {
 				log.Info("Please start Docker for Windows.")
 				log.Info("= OR =")
 				log.Info("Please start and source the docker-machine env by running: ")
-				log.Infof(" - docker-machine start %", config.Conf.Docker.Name)
+				log.Infof(" - docker-machine start %s", config.Conf.Docker.Name)
 				log.Infof(" - eval $(docker-machine env %s)", config.Conf.Docker.Name)
 			}
 		}

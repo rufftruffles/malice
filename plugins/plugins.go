@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/docker/docker/api/types/strslice"
 	runconfigopts "github.com/docker/docker/runconfig/opts"
 	"github.com/malice-plugins/pkgs/utils"
@@ -229,7 +229,7 @@ func (plugin Plugin) UpdatePluginFromRepository(docker *client.Docker) {
 	tags := []string{"malice/" + plugin.Name + ":latest"}
 
 	if config.Conf.Proxy.Enable {
-		buildArgs = runconfigopts.ConvertKVStringsToMapWithNil([]string{
+		buildArgs = convertKVStringsToMapWithNil([]string{
 			"HTTP_PROXY=" + config.Conf.Proxy.HTTP,
 			"HTTPS_PROXY=" + config.Conf.Proxy.HTTPS,
 		})
@@ -283,4 +283,20 @@ func UpdateAllPluginsFromSource(docker *client.Docker) {
 		fmt.Println("[Updating Plugin from Source] ===> ", plugin.Name)
 		plugin.UpdatePluginFromRepository(docker)
 	}
+}
+
+// convertKVStringsToMapWithNil is vendored from docker 18.06's
+// runconfig/opts.ConvertKVStringsToMapWithNil (not present in v17.10).
+func convertKVStringsToMapWithNil(values []string) map[string]*string {
+	m := make(map[string]*string, len(values))
+	for _, value := range values {
+		parts := strings.SplitN(value, "=", 2)
+		key := parts[0]
+		var val string
+		if len(parts) == 2 {
+			val = parts[1]
+		}
+		m[key] = &val
+	}
+	return m
 }

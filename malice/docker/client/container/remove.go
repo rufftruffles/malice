@@ -1,7 +1,7 @@
 package container
 
 import (
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/maliceio/malice/malice/docker/client"
 	"golang.org/x/net/context"

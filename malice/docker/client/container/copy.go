@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/pkg/archive"
@@ -126,7 +126,7 @@ func resolveLocalPath(localPath string) (absPath string, err error) {
 		return
 	}
 
-	return archive.PreserveTrailingDotOrSeparator(absPath, localPath), nil
+	return archive.PreserveTrailingDotOrSeparator(absPath, localPath, filepath.Separator), nil
 }
 
 func statContainerPath(docker *client.Docker, containerName, path string) (types.ContainerPathStat, error) {

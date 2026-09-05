@@ -1,7 +1,7 @@
 package commands
 
 import (
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/malice-plugins/pkgs/database/elasticsearch"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/database"

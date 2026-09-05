@@ -9,13 +9,23 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
-	"github.com/docker/docker/cli"
 	"github.com/docker/go-connections/nat"
 
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
 	"golang.org/x/net/context"
 )
+
+// statusError reports an unsuccessful exit by a command (vendored from
+// github.com/docker/cli's cli.StatusError, which cannot be imported against
+// docker/docker v17.10).
+type statusError struct {
+	statusCode int
+}
+
+func (e statusError) Error() string {
+	return fmt.Sprintf("status code from server: %d", e.statusCode)
+}
 
 type runOptions struct {
 	autoRemove bool
@@ -244,7 +254,7 @@ func Run(
 	// }
 	status := <-statusChan
 	if status != 0 {
-		return cli.StatusError{StatusCode: status}
+		return statusError{statusCode: status}
 	}
 	return nil
 }

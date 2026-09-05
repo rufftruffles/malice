@@ -5,7 +5,7 @@ package docker
 // 	"encoding/json"
 // 	"fmt"
 
-// 	log "github.com/Sirupsen/logrus"
+// 	log "github.com/sirupsen/logrus"
 // 	"github.com/docker/machine/commands/mcndirs"
 // 	"github.com/docker/machine/drivers/virtualbox"
 // 	"github.com/docker/machine/libmachine"
