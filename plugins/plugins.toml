@@ -168,3 +168,13 @@ title = "Malice Plugin Configurations"
   repository = "https://github.com/malice-plugins/rizin.git"
   build = false
   mime = "*"
+
+[[plugin]]
+  enabled = true
+  name = "eset"
+  description = "ESET Endpoint Antivirus (EEA 13.2) on-demand scan (odscan)"
+  category = "av"
+  image = "malice/eset"
+  repository = "https://github.com/malice-plugins/eset.git"
+  build = false
+  mime = "*"
