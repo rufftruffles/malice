@@ -179,3 +179,13 @@ title = "Malice Plugin Configurations"
   build = false
   mime = "*"
   env = ["ESET_LICENSE_KEY"]
+
+[[plugin]]
+  enabled = true
+  name = "kvrt"
+  description = "Kaspersky Virus Removal Tool (Linux) - free daily-updated KAV engine"
+  category = "av"
+  image = "malice/kvrt"
+  repository = "https://github.com/malice-plugins/kvrt.git"
+  build = false
+  mime = "*"
