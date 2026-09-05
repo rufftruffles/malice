@@ -227,6 +227,9 @@ button { font-family: inherit; cursor: pointer; }
 .dropzone .dz-hint b { color: var(--primary); font-weight: 600; }
 .dropzone input[type="file"] { display: none; }
 .dropzone.uploading { border-style: solid; border-color: var(--primary); background: var(--primary-soft); }
+.dropzone.scanning { border-style: solid; border-color: var(--primary); background: var(--primary-soft); }
+.dropzone.scanning .dz-icon { color: var(--primary); animation: dz-sweep 3s linear infinite; }
+@keyframes dz-sweep { to { transform: rotate(360deg); } }
 .up-bar {
   height: 8px;
   border-radius: var(--r-full);

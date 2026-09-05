@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -317,6 +318,13 @@ func summarizeScan(raw json.RawMessage) map[string]interface{} {
 	detections := []string{}
 	for _, cat := range doc.Plugins {
 		for name, res := range cat {
+			// The doc is pre-seeded with a null slot per enabled engine; the slot
+			// is filled when that engine reports. Count only filled slots so
+			// engines_reported climbs 0→N as the scan progresses (a slot count
+			// would be stuck at the total from the first poll).
+			if isNullResult(res) {
+				continue
+			}
 			reported++
 			if isDetection(name, res) {
 				threat = true
@@ -335,6 +343,14 @@ func summarizeScan(raw json.RawMessage) map[string]interface{} {
 		"engines_reported": reported,
 		"detections":       detections,
 	}
+}
+
+// isNullResult reports whether a raw plugin slot is still empty (a JSON null or
+// blank). A slot is null until its engine reports a result; engines that do not
+// apply to a file type (e.g. capa/pescan on a text file) stay null.
+func isNullResult(res json.RawMessage) bool {
+	t := bytes.TrimSpace(res)
+	return len(t) == 0 || string(t) == "null"
 }
 
 // pluginsOf returns the raw plugins tree for the detail view.

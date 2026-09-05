@@ -144,9 +144,14 @@ async function copyText(txt) {
 
 /* ---------- Verdict ---------- */
 function verdictOf(scan) {
-  if (scan.verdict === "threat") return "threat";
+  // While a scan is still in flight (in state.active, not yet settled) show the
+  // animated "Scanning" badge so users know the results aren't final yet — this
+  // takes precedence over an early "threat" so a mid-scan detection doesn't look
+  // like a finished verdict. Once settled the entry leaves state.active and the
+  // final threat/clean verdict shows.
   const sha = scan.file && scan.file.sha256;
-  if (sha && state.active.has(sha) && !state.active.get(sha).stable) return "scanning";
+  if (sha && state.active.has(sha)) return "scanning";
+  if (scan.verdict === "threat") return "threat";
   return "clean";
 }
 function verdictBadge(v) {
@@ -171,6 +176,49 @@ async function pollHealth() {
   }
 }
 
+/* ---------- Dropzone (idle / scanning) ---------- */
+// Returns {name, reported} for the most recently started in-progress scan, or
+// null when no scan is active. `reported` is 0 until the scan doc lands in ES
+// (a few seconds of write latency after upload).
+function activeScanInfo(data) {
+  let bestSha = null;
+  for (const [sha, a] of state.active) {
+    if (bestSha === null || a.startedAt > state.active.get(bestSha).startedAt) bestSha = sha;
+  }
+  if (bestSha === null) return null;
+  const a = state.active.get(bestSha);
+  const s = (data.scans || []).find((x) => x.file && x.file.sha256 === bestSha);
+  return {
+    name: (s && s.file && s.file.name) || a.name || "file",
+    reported: (s && s.engines_reported) || 0,
+  };
+}
+// The dropzone doubles as the scan-progress surface: while a scan is in flight
+// it shows a live "X of N engines reported" bar (the doc is pre-seeded with all
+// slots, so the backend reports the count of filled slots, which climbs 0→N).
+function dropzoneHTML(data) {
+  const info = activeScanInfo(data);
+  if (info) {
+    const rep = info.reported;
+    const pct = Math.min(100, Math.round((rep / state.totalEngines) * 100));
+    return `
+    <div class="dropzone scanning" id="dropzone">
+      <div class="dz-icon">${I.radar}</div>
+      <div class="dz-title">Scanning <b class="up-name" style="color:var(--primary)">${esc(info.name)}</b></div>
+      <div class="up-bar"><div class="up-fill" style="width:${pct}%"></div></div>
+      <div class="dz-hint up-meta"><b>${rep}</b> of ${state.totalEngines} engines reported</div>
+      <input type="file" id="file-input">
+    </div>`;
+  }
+  return `
+    <div class="dropzone" id="dropzone">
+      <div class="dz-icon">${I.upload}</div>
+      <div class="dz-title">Drop a file to scan, or <b style="color:var(--primary)">browse</b></div>
+      <div class="dz-hint">Runs through all ${state.totalEngines} engines · AV, static analysis, intel &amp; document parsers</div>
+      <input type="file" id="file-input">
+    </div>`;
+}
+
 /* ---------- Views ---------- */
 function renderScans(data) {
   const rows = data.scans || [];
@@ -181,17 +229,12 @@ function renderScans(data) {
         <p class="page-sub">${data.total} file${data.total === 1 ? "" : "s"} analyzed across ${state.totalEngines} engines</p>
       </div>
     </div>
-    <div class="dropzone" id="dropzone">
-      <div class="dz-icon">${I.upload}</div>
-      <div class="dz-title">Drop a file to scan, or <b style="color:var(--primary)">browse</b></div>
-      <div class="dz-hint">Runs through all ${state.totalEngines} engines · AV, static analysis, intel &amp; document parsers</div>
-      <input type="file" id="file-input">
-    </div>
+    ${dropzoneHTML(data)}
     <div class="table-wrap">`;
   if (rows.length === 0) {
     html += `<div class="empty"><div class="e-ico">${I.search}</div><div class="e-title">No scans yet</div><div class="e-sub">Upload a file above to run your first multi-engine scan.</div></div>`;
   } else {
-    html += `<div class="scan-row head stagger"><div>File</div><div>SHA-256</div><div>Size</div><div>Scanned</div><div>Verdict</div></div>`;
+    html += `<div class="scan-row head"><div>File</div><div>SHA-256</div><div>Size</div><div>Scanned</div><div>Verdict</div></div>`;
     for (const s of rows) {
       const v = verdictOf(s);
       const f = s.file || {};
@@ -244,7 +287,7 @@ async function uploadFile(file) {
   try {
     const res = await api.upload(file, (loaded, total) => updateUploadProgress(loaded, total));
     if (res.sha256) {
-      state.active.set(res.sha256, { lastReported: 0, stable: 0, startedAt: Date.now() });
+      state.active.set(res.sha256, { lastReported: 0, stable: 0, startedAt: Date.now(), name: file.name });
     }
     ensurePolling();
     // refresh the list (also restores the dropzone after the progress bar)
@@ -445,7 +488,17 @@ function ensurePolling() {
     for (const [sha, a] of state.active) {
       const s = bySha[sha];
       if (s && s.engines_reported !== a.lastReported) { a.lastReported = s.engines_reported; a.stable = 0; changed = true; }
-      else if (s) { a.stable = (a.stable || 0) + 1; if (a.stable >= 3) a.stable = 99; }
+      else if (s) {
+        a.stable = (a.stable || 0) + 1;
+        // Settle only after a quiet window AND a minimum elapsed time. Engines
+        // report in bursts, and the slowest (eset's on-demand AV scan) can report
+        // ~50-60s in, so the old 3-poll (7.5s) window — and even a 30s minimum —
+        // settled mid-scan and froze the detection count at a partial value (it
+        // only corrected on a hard refresh, e.g. 5/17 instead of the final 6/17).
+        // Require 20s of quiet AND 75s elapsed so every engine, including slow
+        // AV, has reported before the scan is marked done.
+        if (a.stable >= 8 && Date.now() - a.startedAt > 75000) a.stable = 99;
+      }
       if (a.stable === 99) state.active.delete(sha);
     }
     // re-render if on scans list or a detail of an active scan

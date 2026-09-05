@@ -115,7 +115,7 @@ title = "Malice Plugin Configurations"
   image = "malice/office"
   repository = "https://github.com/malice-plugins/office.git"
   build = false
-  mime = "*"
+  mime = "application/x-ole-storage, application/ole, application/x-ole2, application/msword, application/vnd.ms-word, application/vnd.ms-excel, application/vnd.ms-powerpoint, application/rtf, application/x-msdownload"
 
 [[plugin]]
   enabled = true
@@ -147,7 +147,7 @@ title = "Malice Plugin Configurations"
   image = "malice/diec"
   repository = "https://github.com/malice-plugins/diec.git"
   build = false
-  mime = "*"
+  mime = "application/x-dosexec, application/x-executable, application/x-elf, application/x-object, application/x-shared-lib"
 
 [[plugin]]
   enabled = true
@@ -167,7 +167,7 @@ title = "Malice Plugin Configurations"
   image = "malice/rizin"
   repository = "https://github.com/malice-plugins/rizin.git"
   build = false
-  mime = "*"
+  mime = "application/x-dosexec, application/x-executable, application/x-elf, application/x-object, application/x-shared-lib, application/x-mach-binary"
 
 [[plugin]]
   enabled = true
