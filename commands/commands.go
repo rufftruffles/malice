@@ -22,7 +22,7 @@ var Commands = []*cli.Command{
 				Usage: "Display the Logs of the Plugin containers",
 			},
 		},
-		Action: func(c *cli.Context) error { return cmdScan(c.Args().First(), c.Bool("logs")) },
+		Action: func(c *cli.Context) error { return cmdScan(c.Args().First(), c.Bool("logs"), true) },
 	},
 	{
 		Name:        "watch",

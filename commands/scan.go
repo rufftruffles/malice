@@ -19,31 +19,29 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// cmdScan scans a sample with all appropriate malice plugins
-func cmdScan(path string, logs bool) error {
+// cmdScan scans a sample with all appropriate malice plugins. When interactive
+// is false (the REST API path) it never prompts on stdin and never log.Fatals —
+// it returns an error instead, so a bad input or a missing image can't hang or
+// kill the web server.
+func cmdScan(path string, logs, interactive bool) error {
 
 	if len(path) > 0 {
 		// Check that file exists
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			log.Fatal(path + ": no such file or directory")
+			if interactive {
+				log.Fatal(path + ": no such file or directory")
+			}
+			return errors.New(path + ": no such file or directory")
 		}
 
 		docker := client.NewDockerClient()
 
-		// clean stale containers from previous runs
-		containers, err := container.List(docker, true)
-		if err != nil {
-			return errors.Wrap(err, "failed to list containers")
-		}
-
-		for _, contr := range containers {
-			if utils.StringInSlice("malice", contr.Names) {
-				err = container.Remove(docker, contr.ID, true, true, true)
-				if err != nil {
-					return errors.Wrapf(err, "failed to remove container: %s", contr.Names[0])
-				}
-			}
-		}
+		// NOTE: the old "clean stale containers" loop here matched the literal
+		// name "malice" against Docker names (which carry a leading "/"), so it
+		// never matched anything. It is also unsafe under concurrent scans — a
+		// substring match would remove another in-flight scan's helper
+		// containers. Helper/plugin containers are now uniquely named per scan
+		// and removed by their own defer, so no startup sweep is needed.
 		elasticsearchInDocker := false
 		es := elasticsearch.Database{
 			Index:    utils.Getopt("MALICE_ELASTICSEARCH_INDEX", "malice"),
@@ -71,6 +69,10 @@ func cmdScan(path string, logs bool) error {
 		// Check Plugin Status
 		if plugins.InstalledPluginsCheck(docker) {
 			log.Debug("All enabled plugins are installed.")
+		} else if !interactive {
+			// Never prompt on stdin in the API path — a missing image must
+			// surface as an error, not a hang or a log.Fatal that kills the server.
+			return errors.New("one or more enabled plugin images are not installed; run 'malice plugin install' first")
 		} else {
 			// Prompt user to install all plugins?
 			fmt.Println("All enabled plugins not installed would you like to install them now? (yes/no)")
@@ -83,7 +85,9 @@ func cmdScan(path string, logs bool) error {
 		es.Plugins = database.GetPluginsByCategory()
 
 		file := persist.File{Path: path}
-		file.Init()
+		if err := file.Init(); err != nil {
+			return errors.Wrap(err, "failed to initialize file")
+		}
 
 		// Output File Hashes
 		file.ToMarkdownTable()
@@ -139,7 +143,7 @@ func cmdScan(path string, logs bool) error {
 	return nil
 }
 
-// APIScan is an API wrapper for cmdScan
+// APIScan is a non-interactive API wrapper for cmdScan.
 func APIScan(file string) error {
-	return cmdScan(file, false)
+	return cmdScan(file, false, false)
 }

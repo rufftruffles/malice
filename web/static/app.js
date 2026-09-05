@@ -70,14 +70,21 @@ function shortHash(h, n = 16) {
   return h.length > n ? h.slice(0, n) + "…" : h;
 }
 
-// Engines where found=true is a positive hit (eset/diec/rizin use found for
-// "processed", so they're excluded — their signals are detections/matches).
-const FOUND_IS_THREAT = new Set(["kvrt", "lmd", "hashlookup", "nsrl", "shadow-server"]);
+// Engines where found=true is itself a positive hit (threat-intel / AV). nsrl
+// and shadow-server are handled specially below because their found=true also
+// fires on known-GOOD matches (NSRL catalog / shadow-server whitelist).
+const FOUND_IS_THREAT = new Set(["kvrt", "lmd", "hashlookup"]);
 function isDetection(name, res) {
   if (!res || typeof res !== "object") return false;
   if (res.infected === true) return true;
   if (["infected", "threat", "malicious"].includes(res.status)) return true;
   if ((res.matches && res.matches.length) || (res.detections && res.detections.length)) return true;
+  if (name === "nsrl") return false; // NSRL hit = known-good NIST software
+  if (name === "shadow-server") {
+    const sb = res.sandbox || {};
+    return (sb.antivirus && Object.keys(sb.antivirus).length) || (sb.metadata && Object.keys(sb.metadata).length);
+  }
+  if (name === "virustotal") return (res.positives || 0) > 0;
   return res.found === true && FOUND_IS_THREAT.has(name);
 }
 const INTEL_ENGINES = new Set(["hashlookup", "nsrl", "shadow-server", "virustotal"]);
@@ -229,9 +236,10 @@ async function uploadFile(file) {
 /* ---------- Scan detail ---------- */
 async function renderScanDetail(id) {
   view.innerHTML = `<div class="empty"><div class="spinner"></div><div class="e-sub" style="margin-top:16px">Loading scan…</div></div>`;
-  let data;
+  let data, engines;
   try {
     data = await api.get("/api/scans/" + id);
+    engines = (await api.get("/api/plugins")).engines;
   } catch (e) {
     view.innerHTML = `<div class="empty"><div class="e-ico">${I.alert}</div><div class="e-title">Scan not found</div><div class="e-sub">${esc(e.message)}</div><a class="back-link" href="#/scans" style="margin-top:18px">${I.back}Back to scans</a></div>`;
     return;
@@ -239,7 +247,6 @@ async function renderScanDetail(id) {
   const f = data.file || {};
   const v = verdictOf(data);
   const plugins = data.plugins || {};
-  const engines = await (await api.get("/api/plugins")).engines;
 
   const detCount = (data.detections || []).length;
   let banner;
@@ -309,7 +316,13 @@ async function renderScanDetail(id) {
 /* ---------- Engines view ---------- */
 async function renderEngines() {
   view.innerHTML = `<div class="empty"><div class="spinner"></div></div>`;
-  const data = await api.get("/api/plugins");
+  let data;
+  try {
+    data = await api.get("/api/plugins");
+  } catch (e) {
+    view.innerHTML = `<div class="empty"><div class="e-ico">${I.alert}</div><div class="e-title">Cannot load engines</div><div class="e-sub">${esc(e.message)}</div></div>`;
+    return;
+  }
   const engines = data.engines || [];
   const byCat = {};
   for (const e of engines) (byCat[e.category] = byCat[e.category] || []).push(e);
@@ -352,9 +365,12 @@ function ensurePolling() {
   if (state.pollTimer) return;
   state.pollTimer = setInterval(async () => {
     if (state.active.size === 0) { clearInterval(state.pollTimer); state.pollTimer = null; return; }
-    // mark stable/timeout
+    // mark stable/timeout. On timeout set 99 so the entry is removed below —
+    // previously it set stable=1, which never reached the 99 the removal checks,
+    // so a scan absent from the list (ES down at upload, failed write, deleted)
+    // kept polling /api/scans every 2.5s forever.
     for (const [sha, a] of state.active) {
-      if (Date.now() - a.startedAt > 150000) a.stable = 1;
+      if (Date.now() - a.startedAt > 150000) a.stable = 99;
     }
     let data;
     try { data = await api.get("/api/scans?size=100"); } catch { return; }

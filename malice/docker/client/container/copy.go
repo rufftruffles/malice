@@ -2,6 +2,8 @@ package container
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,10 +19,22 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// uniqueName returns a container name with a random suffix so concurrent scans
+// don't collide on the fixed "copy2volume" helper name — a collision made the
+// second scan's Start fail and silently skip the copy, so its engines scanned a
+// missing file and stored a bogus "clean" result.
+func uniqueName(prefix string) string {
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return prefix
+	}
+	return prefix + "-" + hex.EncodeToString(b)
+}
+
 // CopyToVolume copies samples into Malice volume
 func CopyToVolume(docker *client.Docker, file persist.File) {
 
-	name := "copy2volume"
+	name := uniqueName("copy2volume")
 	image := "busybox"
 	cmd := strslice.StrSlice{"sh", "-c", "while true; do echo 'Waiting...'; sleep 1; done"}
 	binds := []string{"malice:/malice:rw"}

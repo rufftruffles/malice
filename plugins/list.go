@@ -150,7 +150,10 @@ func getMime(mime string, plugins []Plugin) []Plugin {
 		plugins = Plugs.Plugins
 	}
 	for _, plugin := range plugins {
-		if strings.Contains(plugin.Mime, mime) || strings.Contains(plugin.Mime, "*") {
+		wildcard := strings.Contains(plugin.Mime, "*")
+		// An empty/undetectable MIME must not match every plugin (strings.Contains
+		// with an empty needle is always true); only wildcard plugins run then.
+		if wildcard || (mime != "" && strings.Contains(plugin.Mime, mime)) {
 			mimeMatch = append(mimeMatch, plugin)
 		}
 	}

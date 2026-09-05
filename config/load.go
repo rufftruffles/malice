@@ -106,14 +106,29 @@ func LoadFromToml(configPath, version string) {
 	log.Debug("Malice config loaded from: ", configPath)
 	log.Debugf("config.toml version: %s, malice version: %s", Conf.Version, version)
 	if version != "dev" && !strings.Contains(Conf.Version, version) {
-		// Prompt user to update malice config.toml?
 		log.Infof("Newer version of malice config.toml available: %s, you currently have %s", version, Conf.Version)
-		fmt.Println("Would you like to update now? (yes/no)")
-		if utils.AskForConfirmation() {
-			log.Debug("Updating config: ", configPath)
-			er.CheckError(UpdateConfig())
+		if stdinIsTTY() {
+			fmt.Println("Would you like to update now? (yes/no)")
+			if utils.AskForConfirmation() {
+				log.Debug("Updating config: ", configPath)
+				er.CheckError(UpdateConfig())
+			}
+		} else {
+			// Non-interactive (daemon/docker/CI): never block on stdin.
+			log.Info("non-interactive session; skipping config update prompt")
 		}
 	}
+}
+
+// stdinIsTTY reports whether stdin is an interactive terminal. Prompts that
+// block on stdin must be skipped in daemon/docker/CI contexts (stdin at EOF or
+// an idle pipe) or they hang or crash startup.
+func stdinIsTTY() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
 }
 
 func loadFromBinary(configPath string) {

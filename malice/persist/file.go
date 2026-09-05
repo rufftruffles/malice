@@ -5,9 +5,11 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/md5"
+	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,11 +53,13 @@ type File struct {
 	// Arch string `json:"arch"`
 }
 
-// Init initializes the File object
-func (file *File) Init() {
+// Init initializes the File object. It returns an error instead of
+// log.Fatalling so the REST API path can surface a bad input without killing
+// the server.
+func (file *File) Init() error {
 
 	if file.Path == "" {
-		log.Fatalf("error occured during file.Init() because file.Path was not set.")
+		return fmt.Errorf("file.Init(): file.Path was not set")
 	}
 
 	file.GetName()
@@ -63,16 +67,30 @@ func (file *File) Init() {
 
 	// Read in file data
 	dat, err := ioutil.ReadFile(file.Path)
-	utils.Assert(err)
+	if err != nil {
+		return fmt.Errorf("file.Init(): %w", err)
+	}
 
 	file.GetMD5(dat)
 	file.GetSHA1(dat)
 	file.GetSHA256(dat)
 	file.GetSHA512(dat)
+	return nil
+}
+
+// helperContainerName returns a container name with a random suffix so
+// concurrent scans don't collide on a fixed helper-container name.
+func helperContainerName(prefix string) string {
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return prefix
+	}
+	return prefix + "-" + hex.EncodeToString(b)
 }
 
 // GetMimeType returns file's mime type
 func GetMimeType(docker *client.Docker, arg string) (string, error) {
+	contName := helperContainerName("getmimetype")
 
 	// Create Container
 	createContConf := &container.Config{
@@ -97,7 +115,7 @@ func GetMimeType(docker *client.Docker, arg string) (string, error) {
 	}
 	networkingConfig := &network.NetworkingConfig{}
 
-	contResponse, err := docker.Client.ContainerCreate(context.Background(), apiclient.ContainerCreateOptions{Config: createContConf, HostConfig: hostConfig, NetworkingConfig: networkingConfig, Name: "getmimetype"})
+	contResponse, err := docker.Client.ContainerCreate(context.Background(), apiclient.ContainerCreateOptions{Config: createContConf, HostConfig: hostConfig, NetworkingConfig: networkingConfig, Name: contName})
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +139,7 @@ func GetMimeType(docker *client.Docker, arg string) (string, error) {
 			RemoveLinks:   false,
 			Force:         true,
 		}
-		_, rmErr := docker.Client.ContainerRemove(context.Background(), "getmimetype", contRmOpts)
+		_, rmErr := docker.Client.ContainerRemove(context.Background(), contName, contRmOpts)
 		er.CheckError(rmErr)
 		log.WithFields(log.Fields{
 			"id":   contResponse.ID,

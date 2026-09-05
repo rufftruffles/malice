@@ -10,12 +10,23 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/plugins"
 	"github.com/maliceio/malice/web"
 	log "github.com/sirupsen/logrus"
 )
+
+// maxUploadBytes caps the total size of an uploaded sample. Without it,
+// ParseMultipartForm only bounds the in-memory portion and spools the rest to
+// a temp file with no total limit, so a single large upload could fill the disk.
+const maxUploadBytes = 512 << 20
+
+// scanSem caps concurrent scans. Each scan fans out to ~17 engine containers,
+// so unbounded concurrency is a resource-exhaustion DoS on the docker daemon
+// and Elasticsearch.
+var scanSem = make(chan struct{}, 2)
 
 // scanFunc is injected by the serve command (avoids an api->commands import cycle).
 var scanFunc func(path string) error
@@ -42,12 +53,20 @@ func Start(addr string) error {
 		uiFS.ServeHTTP(w, r)
 	}))
 	log.Infof("malice web UI + REST API listening on %s", addr)
-	return http.ListenAndServe(addr, mux)
+	// Timeouts guard against slowloris / pinned idle connections.
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	return srv.ListenAndServe()
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(v); err != nil {
@@ -57,7 +76,6 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
@@ -97,7 +115,8 @@ func handleScans(w http.ResponseWriter, r *http.Request) {
 		}
 		scans, total, err := SearchScans(from, size)
 		if err != nil {
-			writeErr(w, http.StatusBadGateway, err.Error())
+			log.Errorf("api: search scans: %v", err)
+			writeErr(w, http.StatusBadGateway, "failed to query scans")
 			return
 		}
 		list := make([]map[string]interface{}, 0, len(scans))
@@ -126,7 +145,8 @@ func handleScanDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	src, err := GetScan(id)
 	if err != nil {
-		writeErr(w, http.StatusNotFound, err.Error())
+		log.Errorf("api: get scan %s: %v", id, err)
+		writeErr(w, http.StatusNotFound, "scan not found")
 		return
 	}
 	sum := summarizeScan(src)
@@ -159,19 +179,22 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "scan backend not wired")
 		return
 	}
-	if err := r.ParseMultipartForm(512 << 20); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid multipart form: "+err.Error())
+	// Cap the total request body before parsing; ParseMultipartForm alone only
+	// bounds the in-memory portion and would spool an unbounded body to /tmp.
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
+	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid or oversized upload")
 		return
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "missing 'file' field: "+err.Error())
+		writeErr(w, http.StatusBadRequest, "missing 'file' field")
 		return
 	}
 	defer file.Close()
 
 	name := filepath.Base(header.Filename)
-	if name == "" || name == "." || name == "/" {
+	if name == "" || name == "." || name == ".." || name == "/" {
 		name = "upload"
 	}
 	dir, err := os.MkdirTemp("", "malice-upload-")
@@ -196,8 +219,19 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	dst.Close()
 	sha := hex.EncodeToString(h.Sum(nil))
 
+	// Admit the scan only if a slot is free; otherwise reject with 429 rather
+	// than queueing unbounded concurrent 17-engine scans.
+	select {
+	case scanSem <- struct{}{}:
+	default:
+		os.RemoveAll(dir)
+		writeErr(w, http.StatusTooManyRequests, "too many scans in progress; try again shortly")
+		return
+	}
+
 	go func() {
 		defer func() {
+			<-scanSem
 			if rec := recover(); rec != nil {
 				log.Errorf("scan goroutine panic: %v", rec)
 			}
@@ -216,14 +250,21 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// foundIsThreat lists engines where found=true is a positive detection.
-// For eset/diec/rizin, found=true only means "processed/analyzed", so they
-// are deliberately excluded — their real signals are detections/matches.
+// foundIsThreat lists engines where found=true is itself a positive detection
+// (a threat-intel or AV hit). nsrl and shadow-server are handled specially in
+// isDetection because their found=true also fires on known-GOOD matches.
 var foundIsThreat = map[string]bool{
-	"kvrt": true, "lmd": true, "hashlookup": true, "nsrl": true, "shadow-server": true,
+	"kvrt": true, "lmd": true, "hashlookup": true,
 }
 
 // isDetection reports whether a single engine result is a positive hit.
+// Semantics differ per engine, so the generic found/infected/matches checks
+// are not enough:
+//   - nsrl: found=true means the hash IS in the NIST NSRL (known-GOOD software) — never a threat
+//   - shadow-server: found=true also fires on a whitelist (known-good) match; only a
+//     sandbox antivirus/metadata hit is a real detection
+//   - virustotal: positives are reported as a `positives` int, not found/detections
+//   - eset/diec/rizin: found=true only means "processed/analyzed"; real signals are detections/matches
 func isDetection(name string, res json.RawMessage) bool {
 	var r struct {
 		Found      bool          `json:"found"`
@@ -231,8 +272,25 @@ func isDetection(name string, res json.RawMessage) bool {
 		Status     string        `json:"status"`
 		Matches    []interface{} `json:"matches"`
 		Detections []interface{} `json:"detections"`
+		Positives  int           `json:"positives"`
+		SandBox    struct {
+			MetaData  map[string]string `json:"metadata"`
+			Antivirus map[string]string `json:"antivirus"`
+		} `json:"sandbox"`
 	}
 	_ = json.Unmarshal(res, &r)
+
+	switch name {
+	case "nsrl":
+		// An NSRL hit is NIST's catalog of known-legitimate software — a known-GOOD signal.
+		return false
+	case "shadow-server":
+		// A whitelist match is known-good; only a sandbox AV/metadata hit is a detection.
+		return len(r.SandBox.Antivirus) > 0 || len(r.SandBox.MetaData) > 0
+	case "virustotal":
+		return r.Positives > 0
+	}
+
 	if r.Infected {
 		return true
 	}
