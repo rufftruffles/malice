@@ -6,15 +6,15 @@ import (
 	"os"
 	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/moby/go-archive"
-	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/strslice"
-	apiclient "github.com/moby/moby/client"
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
 	"github.com/maliceio/malice/malice/maldirs"
 	"github.com/maliceio/malice/malice/persist"
+	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/strslice"
+	apiclient "github.com/moby/moby/client"
+	log "github.com/sirupsen/logrus"
 )
 
 // CopyToVolume copies samples into Malice volume

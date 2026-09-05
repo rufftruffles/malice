@@ -44,8 +44,7 @@ version = "v0.3.28"
   run = "development"
 
 [docker]
-  machine-name = "malice"
-  endpoint = "tcp://localhost:2376"
+  endpoint = "unix:///var/run/docker.sock"
   timeout = 120
   binds = "malice:/malware:ro"
   links = "malice-elastic:elasticsearch"

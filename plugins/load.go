@@ -6,9 +6,9 @@ import (
 	"path"
 
 	"github.com/BurntSushi/toml"
-	log "github.com/sirupsen/logrus"
 	er "github.com/maliceio/malice/malice/errors"
 	"github.com/maliceio/malice/malice/maldirs"
+	log "github.com/sirupsen/logrus"
 )
 
 // Plugin represents a single plugin setting.

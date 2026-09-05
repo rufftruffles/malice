@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	log "github.com/sirupsen/logrus"
 	er "github.com/maliceio/malice/malice/errors"
 	"github.com/maliceio/malice/malice/maldirs"
 	"github.com/maliceio/malice/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 // Configuration represents the malice runtime configuration.
@@ -70,7 +70,6 @@ type envConfig struct {
 }
 
 type dockerConfig struct {
-	Name     string `toml:"machine-name"`
 	EndPoint string `toml:"endpoint"`
 	Timeout  int    `toml:"timeout"`
 	Binds    string `toml:"binds"`

@@ -5,19 +5,19 @@ import (
 	"os"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var tasks = []string{"start", "stop"}
 
-// Commands are the codegangsta/cli commands for Malice
-var Commands = []cli.Command{
+// Commands are the urfave/cli commands for Malice
+var Commands = []*cli.Command{
 	{
 		Name:        "scan",
 		Usage:       "Scan a file",
 		Description: "File to be scanned.",
 		Flags: []cli.Flag{
-			cli.BoolFlag{
+			&cli.BoolFlag{
 				Name:  "logs",
 				Usage: "Display the Logs of the Plugin containers",
 			},
@@ -29,7 +29,7 @@ var Commands = []cli.Command{
 		Usage:       "Watch a folder",
 		Description: "Folder to be watched.",
 		Flags: []cli.Flag{
-			cli.BoolFlag{
+			&cli.BoolFlag{
 				Name:  "logs",
 				Usage: "Display the Logs of the Plugin containers",
 			},
@@ -42,7 +42,7 @@ var Commands = []cli.Command{
 		ArgsUsage: "hash of file to lookup `HASH`",
 		// Description: "Hash to be queried.",
 		Flags: []cli.Flag{
-			cli.BoolFlag{
+			&cli.BoolFlag{
 				Name:  "logs",
 				Usage: "Display the Logs of the Plugin containers",
 			},
@@ -61,53 +61,29 @@ var Commands = []cli.Command{
 		Usage:       "Start the ELK docker container",
 		Description: "This ELK container will attach to the ElasticSearch data for all previous malice scans.",
 		Flags: []cli.Flag{
-			cli.BoolFlag{
+			&cli.BoolFlag{
 				Name:  "logs",
 				Usage: "Display the Logs from the ELK Container",
 			},
 		},
 		Action: func(c *cli.Context) error { return cmdELK(c.Bool("logs")) },
 	},
-	// {
-	// 	Name:  "web",
-	// 	Usage: "Start, Stop Web services",
-	// 	Subcommands: []cli.Command{
-	// 		{
-	// 			Name:   "start",
-	// 			Usage:  "start web application",
-	// 			Action: func(c *cli.Context) error { return cmdWebStart() },
-	// 		},
-	// 		{
-	// 			Name:   "stop",
-	// 			Usage:  "stop web application",
-	// 			Action: func(c *cli.Context) error { return cmdWebStop() },
-	// 		},
-	// 	},
-	// 	BashComplete: func(c *cli.Context) {
-	// 		// This will complete if no args are passed
-	// 		if len(c.Args()) > 0 {
-	// 			return
-	// 		}
-	// 		for _, t := range tasks {
-	// 			fmt.Println(t)
-	// 		}
-	// 	},
-	// },
 	{
 		Name:  "plugin",
 		Usage: "List, Install or Remove Plugins",
-		Subcommands: []cli.Command{
+		Subcommands: []*cli.Command{
 			{
 				Name:  "list",
 				Usage: "list enabled installed plugins",
 				Flags: []cli.Flag{
-					cli.BoolFlag{
+					&cli.BoolFlag{
 						Name:  "all",
 						Usage: "display all installed plugins",
 					},
-					cli.BoolFlag{
-						Name:  "detail,d",
-						Usage: "display plugin details",
+					&cli.BoolFlag{
+						Name:    "detail",
+						Aliases: []string{"d"},
+						Usage:   "display plugin details",
 					},
 				},
 				Action: func(c *cli.Context) error { return cmdListPlugins(c.Bool("all"), c.Bool("detail")) },
@@ -126,13 +102,14 @@ var Commands = []cli.Command{
 				Name:  "update",
 				Usage: "update plugin",
 				Flags: []cli.Flag{
-					cli.BoolFlag{
+					&cli.BoolFlag{
 						Name:  "all",
 						Usage: "update all installed plugins",
 					},
-					cli.BoolFlag{
-						Name:  "s,source",
-						Usage: "update plugin from source repo",
+					&cli.BoolFlag{
+						Name:    "source",
+						Aliases: []string{"s"},
+						Usage:   "update plugin from source repo",
 					},
 				},
 				Action: func(c *cli.Context) error { return cmdUpdatePlugin(c.Args().First(), c.Bool("all"), c.Bool("source")) },
@@ -140,7 +117,7 @@ var Commands = []cli.Command{
 		},
 		BashComplete: func(c *cli.Context) {
 			// This will complete if no args are passed
-			if len(c.Args()) > 0 {
+			if c.Args().Len() > 0 {
 				return
 			}
 			for _, t := range tasks {

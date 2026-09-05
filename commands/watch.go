@@ -3,9 +3,9 @@ package commands
 import (
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/fsnotify/fsnotify"
 	"github.com/maliceio/malice/config"
+	log "github.com/sirupsen/logrus"
 )
 
 func cmdWatch(folderName string, logs bool) error {

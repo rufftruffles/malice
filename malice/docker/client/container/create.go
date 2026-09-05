@@ -8,12 +8,12 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
+	"github.com/maliceio/malice/malice/docker/client"
+	er "github.com/maliceio/malice/malice/errors"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	apiclient "github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/jsonmessage"
-	"github.com/maliceio/malice/malice/docker/client"
-	er "github.com/maliceio/malice/malice/errors"
 )
 
 func pullImage(ctx context.Context, docker *client.Docker, image string, out io.Writer) error {

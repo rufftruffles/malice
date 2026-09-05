@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sirupsen/logrus"
 	"github.com/maliceio/malice/config"
+	"github.com/sirupsen/logrus"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 

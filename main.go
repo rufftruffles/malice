@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 
 	"github.com/maliceio/malice/commands"
 	"github.com/maliceio/malice/config"
@@ -65,8 +65,9 @@ func main() {
 	app := cli.NewApp()
 
 	app.Name = "malice"
-	app.Author = "blacktop"
-	app.Email = "https://github.com/blacktop"
+	app.Authors = []*cli.Author{
+		{Name: "blacktop", Email: "https://github.com/blacktop"},
+	}
 
 	app.Commands = commands.Commands
 	app.CommandNotFound = commands.CmdNotFound
@@ -78,10 +79,11 @@ func main() {
 	log.Debug("Malice Version: ", app.Version)
 
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			EnvVar: "MALICE_DEBUG",
-			Name:   "debug, D",
-			Usage:  "Enable debug mode",
+		&cli.BoolFlag{
+			Name:    "debug",
+			Aliases: []string{"D"},
+			EnvVars: []string{"MALICE_DEBUG"},
+			Usage:   "Enable debug mode",
 		},
 	}
 

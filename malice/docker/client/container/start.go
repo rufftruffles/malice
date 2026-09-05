@@ -5,15 +5,15 @@ import (
 	"errors"
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/maliceio/malice/config"
+	"github.com/maliceio/malice/malice/docker/client"
+	er "github.com/maliceio/malice/malice/errors"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/strslice"
 	apiclient "github.com/moby/moby/client"
-	"github.com/maliceio/malice/config"
-	"github.com/maliceio/malice/malice/docker/client"
-	er "github.com/maliceio/malice/malice/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 // Start starts a malice docker container

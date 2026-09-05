@@ -18,12 +18,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/crackcomm/go-clitable"
-	apiclient "github.com/moby/moby/client"
-	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/network"
-	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/docker/go-units"
 	"github.com/dustin/go-jsonpointer"
 	"github.com/malice-plugins/pkgs/utils"
@@ -32,6 +27,11 @@ import (
 	er "github.com/maliceio/malice/malice/errors"
 	"github.com/maliceio/malice/malice/maldirs"
 	"github.com/maliceio/malice/malice/malutils"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	apiclient "github.com/moby/moby/client"
+	log "github.com/sirupsen/logrus"
 	// "github.com/dutchcoders/gossdeep"
 )
 
@@ -121,7 +121,7 @@ func GetMimeType(docker *client.Docker, arg string) (string, error) {
 			Force:         true,
 		}
 		_, rmErr := docker.Client.ContainerRemove(context.Background(), "getmimetype", contRmOpts)
-                er.CheckError(rmErr)
+		er.CheckError(rmErr)
 		log.WithFields(log.Fields{
 			"id":   contResponse.ID,
 			"env":  config.Conf.Environment.Run,
@@ -223,7 +223,7 @@ func GetFileInfo(docker *client.Docker, arg string, search string) (string, erro
 			Force:         true,
 		}
 		_, rmErr := docker.Client.ContainerRemove(ctx, contResponse.ID, contRmOpts)
-                er.CheckError(rmErr)
+		er.CheckError(rmErr)
 		log.WithFields(log.Fields{
 			"id":   contResponse.ID,
 			"env":  config.Conf.Environment.Run,

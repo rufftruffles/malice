@@ -5,17 +5,15 @@ var AppHelpTemplate = `Usage: {{.Name}} {{if .Flags}}[OPTIONS] {{end}}COMMAND [a
 
 {{.Usage}}
 
-Version: {{.Version}}{{if or .Author .Email}}
+Version: {{.Version}}{{if .Authors}}
 
-Author:{{if .Author}}
-  {{.Author}}{{if .Email}} - <{{.Email}}>{{end}}{{else}}
-  {{.Email}}{{end}}{{end}}
-{{if .Flags}}
+Author:{{range .Authors}}
+  {{.}}{{end}}{{end}}{{if .Flags}}
 Options:
   {{range .Flags}}{{.}}
   {{end}}{{end}}
 Commands:
-  {{range .Commands}}{{.Name}}{{with .ShortName}}, {{.}}{{end}}{{ "\t" }}{{.Usage}}
+  {{range .Commands}}{{.Name}}{{ "\t" }}{{.Usage}}
   {{end}}
 Run '{{.Name}} COMMAND --help' for more information on a command.
 `

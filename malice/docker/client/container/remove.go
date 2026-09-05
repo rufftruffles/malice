@@ -3,9 +3,9 @@ package container
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
-	apiclient "github.com/moby/moby/client"
 	"github.com/maliceio/malice/malice/docker/client"
+	apiclient "github.com/moby/moby/client"
+	log "github.com/sirupsen/logrus"
 )
 
 // Remove removes the `cont` container unforcedly.

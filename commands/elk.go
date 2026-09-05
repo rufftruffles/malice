@@ -1,7 +1,6 @@
 package commands
 
 import (
-	log "github.com/sirupsen/logrus"
 	"github.com/malice-plugins/pkgs/database/elasticsearch"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/database"
@@ -9,6 +8,7 @@ import (
 	"github.com/maliceio/malice/malice/docker/client/container"
 	"github.com/maliceio/malice/malice/ui"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 func cmdELK(logs bool) error {

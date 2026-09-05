@@ -5,11 +5,11 @@ import (
 	"regexp"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/moby/moby/api/types/volume"
-	apiclient "github.com/moby/moby/client"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
+	"github.com/moby/moby/api/types/volume"
+	apiclient "github.com/moby/moby/client"
+	log "github.com/sirupsen/logrus"
 )
 
 // Exists returns volume.Volume and true

@@ -12,8 +12,6 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
-	log "github.com/sirupsen/logrus"
-	"github.com/moby/moby/api/types/strslice"
 	"github.com/malice-plugins/pkgs/utils"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
@@ -21,7 +19,9 @@ import (
 	"github.com/maliceio/malice/malice/docker/client/image"
 	er "github.com/maliceio/malice/malice/errors"
 	"github.com/maliceio/malice/malice/maldirs"
+	"github.com/moby/moby/api/types/strslice"
 	"github.com/parnurzeal/gorequest"
+	log "github.com/sirupsen/logrus"
 )
 
 // StartPlugin starts plugin
@@ -149,7 +149,7 @@ func PostResults(url string, resultJSON []byte, taskID string) {
 		End(printStatus)
 }
 
-//InstallPlugin installs a new malice plugin
+// InstallPlugin installs a new malice plugin
 func InstallPlugin(plugin *Plugin) (err error) {
 
 	var newPlugin = Configuration{

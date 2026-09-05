@@ -4,12 +4,12 @@ import (
 	"context"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/moby/moby/api/types/container"
-	apiclient "github.com/moby/moby/client"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
+	"github.com/moby/moby/api/types/container"
+	apiclient "github.com/moby/moby/client"
+	log "github.com/sirupsen/logrus"
 )
 
 // List returns array of container.Summary and error

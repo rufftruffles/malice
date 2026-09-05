@@ -4,12 +4,12 @@ import (
 	"errors"
 	"net/netip"
 
-	log "github.com/sirupsen/logrus"
-	contapi "github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/network"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
 	"github.com/maliceio/malice/malice/docker/client/container"
+	contapi "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	log "github.com/sirupsen/logrus"
 )
 
 // Start creates an Kibana container from the image blacktop/kibana:malice

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/fatih/structs"
 	"github.com/malice-plugins/pkgs/database/elasticsearch"
 	"github.com/malice-plugins/pkgs/utils"
@@ -17,6 +16,7 @@ import (
 	"github.com/maliceio/malice/malice/persist"
 	"github.com/maliceio/malice/plugins"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 // cmdScan scans a sample with all appropriate malice plugins

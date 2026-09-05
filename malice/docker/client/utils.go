@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/moby/moby/client"
 	er "github.com/maliceio/malice/malice/errors"
+	"github.com/moby/moby/client"
+	log "github.com/sirupsen/logrus"
 )
 
 // Ping pings docker client to see if it is up or not by checking Info.

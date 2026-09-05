@@ -6,7 +6,6 @@ import (
 	"net/netip"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/docker/go-units"
 	"github.com/malice-plugins/pkgs/database/elasticsearch"
 	"github.com/maliceio/malice/config"
@@ -16,6 +15,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 	apiclient "github.com/moby/moby/client"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 // GetPluginsByCategory gets malice plugins organized by category

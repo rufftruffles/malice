@@ -11,7 +11,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/maliceio/malice/config"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var (
@@ -34,14 +34,15 @@ func main() {
 	app := cli.NewApp()
 
 	app.Name = "tomlupdate"
-	app.Author = "blacktop"
-	app.Email = "https://github.com/blacktop"
+	app.Authors = []*cli.Author{
+		{Name: "blacktop", Email: "https://github.com/blacktop"},
+	}
 	app.Version = version + ", BuildTime: " + buildtime
 	app.Compiled, _ = time.Parse("20060102", buildtime)
 	app.Usage = "Update Version in Malice Config TOML"
 	app.ArgsUsage = "malice VERSION"
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:        "path",
 			Value:       "",
 			Usage:       "path to malice config TOML",

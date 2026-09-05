@@ -7,12 +7,12 @@ import (
 
 	"github.com/cloudflare/cfssl/log"
 	"github.com/docker/cli/cli"
+	"github.com/maliceio/malice/malice/docker/client"
+	er "github.com/maliceio/malice/malice/errors"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/strslice"
 	apiclient "github.com/moby/moby/client"
-	"github.com/maliceio/malice/malice/docker/client"
-	er "github.com/maliceio/malice/malice/errors"
 )
 
 type runOptions struct {

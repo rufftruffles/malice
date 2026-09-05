@@ -371,29 +371,31 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"plugins/plugins.toml": pluginsPluginsToml,
-	"plugins/templates/python/.dockerignore": pluginsTemplatesPythonDockerignore,
+	"plugins/plugins.toml":                         pluginsPluginsToml,
+	"plugins/templates/python/.dockerignore":       pluginsTemplatesPythonDockerignore,
 	"plugins/templates/python/.gitignore.template": pluginsTemplatesPythonGitignoreTemplate,
-	"plugins/templates/python/CHANGELOG.md": pluginsTemplatesPythonChangelogMd,
-	"plugins/templates/python/Dockerfile": pluginsTemplatesPythonDockerfile,
-	"plugins/templates/python/LICENSE.md": pluginsTemplatesPythonLicenseMd,
-	"plugins/templates/python/README-short.txt": pluginsTemplatesPythonReadmeShortTxt,
-	"plugins/templates/python/README.md": pluginsTemplatesPythonReadmeMd,
-	"plugins/templates/python/circle.yml": pluginsTemplatesPythonCircleYml,
-	"plugins/templates/python/plugin.toml": pluginsTemplatesPythonPluginToml,
-	"plugins/templates/python/requirements.txt": pluginsTemplatesPythonRequirementsTxt,
-	"plugins/templates/python/scan.py": pluginsTemplatesPythonScanPy,
+	"plugins/templates/python/CHANGELOG.md":        pluginsTemplatesPythonChangelogMd,
+	"plugins/templates/python/Dockerfile":          pluginsTemplatesPythonDockerfile,
+	"plugins/templates/python/LICENSE.md":          pluginsTemplatesPythonLicenseMd,
+	"plugins/templates/python/README-short.txt":    pluginsTemplatesPythonReadmeShortTxt,
+	"plugins/templates/python/README.md":           pluginsTemplatesPythonReadmeMd,
+	"plugins/templates/python/circle.yml":          pluginsTemplatesPythonCircleYml,
+	"plugins/templates/python/plugin.toml":         pluginsTemplatesPythonPluginToml,
+	"plugins/templates/python/requirements.txt":    pluginsTemplatesPythonRequirementsTxt,
+	"plugins/templates/python/scan.py":             pluginsTemplatesPythonScanPy,
 }
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"}
 // AssetDir("data/img") would return []string{"a.png", "b.png"}
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error
@@ -424,22 +426,23 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"plugins": &bintree{nil, map[string]*bintree{
 		"plugins.toml": &bintree{pluginsPluginsToml, map[string]*bintree{}},
 		"templates": &bintree{nil, map[string]*bintree{
 			"python": &bintree{nil, map[string]*bintree{
-				".dockerignore": &bintree{pluginsTemplatesPythonDockerignore, map[string]*bintree{}},
+				".dockerignore":       &bintree{pluginsTemplatesPythonDockerignore, map[string]*bintree{}},
 				".gitignore.template": &bintree{pluginsTemplatesPythonGitignoreTemplate, map[string]*bintree{}},
-				"CHANGELOG.md": &bintree{pluginsTemplatesPythonChangelogMd, map[string]*bintree{}},
-				"Dockerfile": &bintree{pluginsTemplatesPythonDockerfile, map[string]*bintree{}},
-				"LICENSE.md": &bintree{pluginsTemplatesPythonLicenseMd, map[string]*bintree{}},
-				"README-short.txt": &bintree{pluginsTemplatesPythonReadmeShortTxt, map[string]*bintree{}},
-				"README.md": &bintree{pluginsTemplatesPythonReadmeMd, map[string]*bintree{}},
-				"circle.yml": &bintree{pluginsTemplatesPythonCircleYml, map[string]*bintree{}},
-				"plugin.toml": &bintree{pluginsTemplatesPythonPluginToml, map[string]*bintree{}},
-				"requirements.txt": &bintree{pluginsTemplatesPythonRequirementsTxt, map[string]*bintree{}},
-				"scan.py": &bintree{pluginsTemplatesPythonScanPy, map[string]*bintree{}},
+				"CHANGELOG.md":        &bintree{pluginsTemplatesPythonChangelogMd, map[string]*bintree{}},
+				"Dockerfile":          &bintree{pluginsTemplatesPythonDockerfile, map[string]*bintree{}},
+				"LICENSE.md":          &bintree{pluginsTemplatesPythonLicenseMd, map[string]*bintree{}},
+				"README-short.txt":    &bintree{pluginsTemplatesPythonReadmeShortTxt, map[string]*bintree{}},
+				"README.md":           &bintree{pluginsTemplatesPythonReadmeMd, map[string]*bintree{}},
+				"circle.yml":          &bintree{pluginsTemplatesPythonCircleYml, map[string]*bintree{}},
+				"plugin.toml":         &bintree{pluginsTemplatesPythonPluginToml, map[string]*bintree{}},
+				"requirements.txt":    &bintree{pluginsTemplatesPythonRequirementsTxt, map[string]*bintree{}},
+				"scan.py":             &bintree{pluginsTemplatesPythonScanPy, map[string]*bintree{}},
 			}},
 		}},
 	}},
@@ -491,4 +494,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-

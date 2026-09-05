@@ -5,11 +5,11 @@ import (
 	"os/exec"
 	"runtime"
 
-	log "github.com/sirupsen/logrus"
+	"context"
 	"github.com/malice-plugins/pkgs/utils"
 	"github.com/maliceio/malice/config"
 	"github.com/moby/moby/client"
-	"context"
+	log "github.com/sirupsen/logrus"
 )
 
 // NOTE: https://github.com/eris-ltd/eris-cli/blob/master/perform/docker_run.go

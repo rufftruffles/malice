@@ -4,12 +4,12 @@ import (
 	"context"
 	"regexp"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/maliceio/malice/config"
+	"github.com/maliceio/malice/malice/docker/client"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	apiclient "github.com/moby/moby/client"
-	"github.com/maliceio/malice/config"
-	"github.com/maliceio/malice/malice/docker/client"
+	log "github.com/sirupsen/logrus"
 )
 
 // Exists returns network.Summary and true

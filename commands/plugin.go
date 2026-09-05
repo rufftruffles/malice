@@ -3,9 +3,9 @@ package commands
 import (
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/maliceio/malice/malice/docker/client"
 	"github.com/maliceio/malice/plugins"
+	log "github.com/sirupsen/logrus"
 )
 
 func cmdEnablePlugin() {

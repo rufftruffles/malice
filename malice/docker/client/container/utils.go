@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"strconv"
 
-	log "github.com/sirupsen/logrus"
+	er "github.com/maliceio/malice/malice/errors"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/events"
 	apiclient "github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/versions"
-	er "github.com/maliceio/malice/malice/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
