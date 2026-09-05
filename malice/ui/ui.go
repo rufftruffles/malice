@@ -2,20 +2,21 @@ package ui
 
 import (
 	"errors"
+	"net/netip"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/go-connections/nat"
+	contapi "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
 	"github.com/maliceio/malice/malice/docker/client/container"
 )
 
 // Start creates an Kibana container from the image blacktop/kibana:malice
-func Start(docker *client.Docker, logs bool) (types.ContainerJSONBase, error) {
+func Start(docker *client.Docker, logs bool) (contapi.InspectResponse, error) {
 
-	portBindings := nat.PortMap{
-		"5601/tcp": {{HostIP: "0.0.0.0", HostPort: "80"}},
+	portBindings := network.PortMap{
+		network.MustParsePort("5601/tcp"): {{HostIP: netip.MustParseAddr("0.0.0.0"), HostPort: "80"}},
 	}
 
 	if docker.Ping() {
@@ -26,9 +27,9 @@ func Start(docker *client.Docker, logs bool) (types.ContainerJSONBase, error) {
 			config.Conf.UI.Image,               // image string,
 			logs,                               // logs bool,
 			nil,                                // binds []string,
-			portBindings,                       // portBindings nat.PortMap,
+			portBindings,                       // portBindings network.PortMap,
 			[]string{config.Conf.Docker.Links}, // links []string,
-			nil, // env []string,
+			nil,                                // env []string,
 		)
 		log.WithFields(log.Fields{
 			"ip":   docker.GetIP(),
@@ -39,7 +40,7 @@ func Start(docker *client.Docker, logs bool) (types.ContainerJSONBase, error) {
 
 		return contJSON, err
 	}
-	return types.ContainerJSONBase{}, errors.New("Cannot connect to the Docker daemon. Is the docker daemon running on this host?")
+	return contapi.InspectResponse{}, errors.New("Cannot connect to the Docker daemon. Is the docker daemon running on this host?")
 }
 
 // Init initalizes Kibana for use with malice

@@ -52,3 +52,4 @@ data/output.md
 .helpers/
 _vendor-20180727160245/
 *.log
+malice-bin

@@ -1,10 +1,11 @@
 package container
 
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/types"
+	apiclient "github.com/moby/moby/client"
 	"github.com/maliceio/malice/malice/docker/client"
-	"golang.org/x/net/context"
 )
 
 // Remove removes the `cont` container unforcedly.
@@ -14,30 +15,16 @@ import (
 func Remove(docker *client.Docker, contID string, volumes bool, links bool, force bool) error {
 	log.Debug("Removing container: ", contID)
 	return removeContainer(docker, context.Background(), contID, volumes, links, force)
-	// // check if container exists
-	// if plugin, exists, _ := Exists(docker, cont.Name); exists {
-	// 	log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Debug("Removing Plugin container: ", cont.Name)
-	// 	er.CheckError(docker.Client.ContainerRemove(context.Background(), plugin.ID, types.ContainerRemoveOptions{
-	// 		RemoveVolumes: true,
-	// 		// RemoveLinks:   links,
-	// 		Force: true,
-	// 	}))
-	// } else {
-	// 	// container not found
-	// 	log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Error("Plugin container does not exist. Cannot remove.")
-	// }
-	// return nil
 }
 
 // removeContainer
 func removeContainer(docker *client.Docker, ctx context.Context, container string, removeVolumes, removeLinks, force bool) error {
-	// name = strings.Trim(name, "/")
-	options := types.ContainerRemoveOptions{
+	options := apiclient.ContainerRemoveOptions{
 		RemoveVolumes: removeVolumes,
 		RemoveLinks:   removeLinks,
 		Force:         force,
 	}
-	if err := docker.Client.ContainerRemove(ctx, container, options); err != nil {
+	if _, err := docker.Client.ContainerRemove(ctx, container, options); err != nil {
 		return err
 	}
 	return nil

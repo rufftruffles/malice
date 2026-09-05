@@ -20,10 +20,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/crackcomm/go-clitable"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/pkg/stdcopy"
+	apiclient "github.com/moby/moby/client"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/docker/go-units"
 	"github.com/dustin/go-jsonpointer"
 	"github.com/malice-plugins/pkgs/utils"
@@ -96,13 +96,13 @@ func GetMimeType(docker *client.Docker, arg string) (string, error) {
 	}
 	networkingConfig := &network.NetworkingConfig{}
 
-	contResponse, err := docker.Client.ContainerCreate(context.Background(), createContConf, hostConfig, networkingConfig, "getmimetype")
+	contResponse, err := docker.Client.ContainerCreate(context.Background(), apiclient.ContainerCreateOptions{Config: createContConf, HostConfig: hostConfig, NetworkingConfig: networkingConfig, Name: "getmimetype"})
 	if err != nil {
 		return "", err
 	}
 
 	// Start Container
-	err = docker.Client.ContainerStart(context.Background(), contResponse.ID, types.ContainerStartOptions{})
+	_, err = docker.Client.ContainerStart(context.Background(), contResponse.ID, apiclient.ContainerStartOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -115,12 +115,13 @@ func GetMimeType(docker *client.Docker, arg string) (string, error) {
 
 	defer func() {
 		// remove container when done
-		contRmOpts := types.ContainerRemoveOptions{
+		contRmOpts := apiclient.ContainerRemoveOptions{
 			RemoveVolumes: true,
 			RemoveLinks:   false,
 			Force:         true,
 		}
-		er.CheckError(docker.Client.ContainerRemove(context.Background(), "getmimetype", contRmOpts))
+		_, rmErr := docker.Client.ContainerRemove(context.Background(), "getmimetype", contRmOpts)
+                er.CheckError(rmErr)
 		log.WithFields(log.Fields{
 			"id":   contResponse.ID,
 			"env":  config.Conf.Environment.Run,
@@ -131,7 +132,7 @@ func GetMimeType(docker *client.Docker, arg string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	options := types.ContainerLogsOptions{
+	options := apiclient.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -172,13 +173,13 @@ func GetFileInfo(docker *client.Docker, arg string, search string) (string, erro
 	}
 	networkingConfig := &network.NetworkingConfig{}
 
-	contResponse, err := docker.Client.ContainerCreate(context.Background(), createContConf, hostConfig, networkingConfig, "")
+	contResponse, err := docker.Client.ContainerCreate(context.Background(), apiclient.ContainerCreateOptions{Config: createContConf, HostConfig: hostConfig, NetworkingConfig: networkingConfig, Name: ""})
 	if err != nil {
 		return "", err
 	}
 
 	// Start Container
-	err = docker.Client.ContainerStart(context.Background(), contResponse.ID, types.ContainerStartOptions{})
+	_, err = docker.Client.ContainerStart(context.Background(), contResponse.ID, apiclient.ContainerStartOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -186,7 +187,7 @@ func GetFileInfo(docker *client.Docker, arg string, search string) (string, erro
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	options := types.ContainerLogsOptions{
+	options := apiclient.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -216,12 +217,13 @@ func GetFileInfo(docker *client.Docker, arg string, search string) (string, erro
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		contRmOpts := types.ContainerRemoveOptions{
+		contRmOpts := apiclient.ContainerRemoveOptions{
 			RemoveVolumes: true,
 			RemoveLinks:   true,
 			Force:         true,
 		}
-		er.CheckError(docker.Client.ContainerRemove(ctx, contResponse.ID, contRmOpts))
+		_, rmErr := docker.Client.ContainerRemove(ctx, contResponse.ID, contRmOpts)
+                er.CheckError(rmErr)
 		log.WithFields(log.Fields{
 			"id":   contResponse.ID,
 			"env":  config.Conf.Environment.Run,

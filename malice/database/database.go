@@ -3,17 +3,18 @@ package database
 import (
 	"bytes"
 	"context"
+	"net/netip"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
 	"github.com/malice-plugins/pkgs/database/elasticsearch"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
 	"github.com/maliceio/malice/malice/docker/client/container"
 	"github.com/maliceio/malice/plugins"
+	"github.com/moby/moby/api/types/network"
+	apiclient "github.com/moby/moby/client"
 	"github.com/pkg/errors"
 )
 
@@ -37,8 +38,8 @@ func Start(docker *client.Docker, es elasticsearch.Database, logs bool) error {
 	name := config.Conf.DB.Name
 	image := config.Conf.DB.Image
 	binds := []string{"malice:/usr/share/elasticsearch/data"}
-	portBindings := nat.PortMap{
-		"9200/tcp": {{HostIP: "0.0.0.0", HostPort: "9200"}},
+	portBindings := network.PortMap{
+		network.MustParsePort("9200/tcp"): {{HostIP: netip.MustParseAddr("0.0.0.0"), HostPort: "9200"}},
 	}
 
 	if docker.Ping() {
@@ -56,7 +57,7 @@ func Start(docker *client.Docker, es elasticsearch.Database, logs bool) error {
 		log.WithFields(log.Fields{
 			// "id":   cont.ID,
 			"docker_ip":   docker.GetIP(),
-			"assigned_ip": dbInfo.NetworkSettings.IPAddress,
+			"assigned_ip": dbInfo.NetworkSettings.Networks["bridge"].IPAddress,
 			"port":        config.Conf.DB.Ports,
 			"name":        esContainer.Name,
 			"runtime_env": config.Conf.Environment.Run,
@@ -65,7 +66,7 @@ func Start(docker *client.Docker, es elasticsearch.Database, logs bool) error {
 		// Wait for Elasticsearch to start (takes ~10-20 secs)
 		err = es.WaitForConnection(context.Background(), config.Conf.DB.Timeout)
 		if err != nil {
-			logOpts := types.ContainerLogsOptions{
+			logOpts := apiclient.ContainerLogsOptions{
 				ShowStdout: true,
 				ShowStderr: true,
 				Follow:     false,
@@ -82,11 +83,11 @@ func Start(docker *client.Docker, es elasticsearch.Database, logs bool) error {
 
 			// Check if elasticsearch could not start due to lack of RAM
 			if strings.Contains(logStr, "There is insufficient memory for the Java Runtime Environment to continue") {
-				info, err := docker.Client.Info(context.Background())
+				info, err := docker.Client.Info(context.Background(), apiclient.InfoOptions{})
 				if err != nil {
 					return err
 				}
-				log.Fatal("You do not have enough RAM to run elasticsearch. Elasticsearch needs at least 2GB and you have: ", units.BytesSize(float64(info.MemTotal)))
+				log.Fatal("You do not have enough RAM to run elasticsearch. Elasticsearch needs at least 2GB and you have: ", units.BytesSize(float64(info.Info.MemTotal)))
 			}
 			if err != nil {
 				return err

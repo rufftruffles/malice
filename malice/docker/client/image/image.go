@@ -1,29 +1,27 @@
 package image
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"text/tabwriter"
 
-	"golang.org/x/net/context"
-
-	"regexp"
-
-	"github.com/docker/docker/api/types"
-	registrytypes "github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/builder/dockerignore"
-	build "github.com/maliceio/malice/malice/docker/client/buildctx"
-	"github.com/docker/docker/pkg/archive"
-	"github.com/docker/docker/pkg/fileutils"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/pkg/progress"
-	"github.com/docker/docker/pkg/streamformatter"
-	"github.com/docker/docker/pkg/urlutil"
-	"github.com/docker/docker/registry"
+	"github.com/docker/cli/cli/command/image/build"
+	"github.com/moby/moby/api/types/jsonstream"
+	imagetypes "github.com/moby/moby/api/types/image"
+	registrytypes "github.com/moby/moby/api/types/registry"
+	apiclient "github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/jsonmessage"
+	"github.com/moby/moby/client/pkg/progress"
+	"github.com/moby/moby/client/pkg/streamformatter"
+	"github.com/moby/go-archive"
+	"github.com/moby/go-archive/compression"
+	"github.com/moby/patternmatcher"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
@@ -31,11 +29,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// defaultSearchLimit is the default number of results to return from a search
+const defaultSearchLimit = 25
+
 // Pull pulls docker image:tag
 // TODO: add trusted pull for offcial malice plugins
 func Pull(docker *client.Docker, id string, tag string) {
 
-	responseBody, err := docker.Client.ImagePull(context.Background(), id, types.ImagePullOptions{})
+	responseBody, err := docker.Client.ImagePull(context.Background(), id, apiclient.ImagePullOptions{})
 	defer responseBody.Close()
 	er.CheckError(err)
 
@@ -61,12 +62,17 @@ func Build(docker *client.Docker, repository string, tags []string, buildArgs ma
 	progBuff = os.Stdout
 	buildBuff = os.Stdout
 
-	switch {
-	case repository == "-":
+	ctxType, err := build.DetectContextType(repository)
+	if err != nil {
+		er.CheckError(err)
+	}
+
+	switch ctxType {
+	case build.ContextTypeStdin:
 		buildCtx, relDockerfile, err = build.GetContextFromReader(os.Stdin, "")
-	case urlutil.IsGitURL(repository):
+	case build.ContextTypeGit:
 		tempDir, relDockerfile, err = build.GetContextFromGitURL(repository, "")
-	case urlutil.IsURL(repository):
+	case build.ContextTypeRemote:
 		buildCtx, relDockerfile, err = build.GetContextFromURL(progBuff, repository, "")
 	default:
 		_, relDockerfile, err = build.GetContextFromLocalDir(repository, "")
@@ -79,23 +85,11 @@ func Build(docker *client.Docker, repository string, tags []string, buildArgs ma
 
 	if buildCtx == nil {
 		// And canonicalize dockerfile name to a platform-independent one
-		relDockerfile, err = archive.CanonicalTarNameForPath(relDockerfile)
-		if err != nil {
-			log.Fatalf("cannot canonicalize dockerfile path %s: %v", relDockerfile, err)
-		}
-
-		f, err := os.Open(filepath.Join(contextDir, ".dockerignore"))
-		if err != nil && !os.IsNotExist(err) {
-			er.CheckError(err)
-		}
-		defer f.Close()
+		relDockerfile = filepath.ToSlash(relDockerfile)
 
 		var excludes []string
-		if err == nil {
-			excludes, err = dockerignore.ReadAll(f)
-			if err != nil {
-				er.CheckError(err)
-			}
+		if excludes, err = build.ReadDockerignore(contextDir); err != nil {
+			er.CheckError(err)
 		}
 
 		if err := build.ValidateContextDirectory(contextDir, excludes); err != nil {
@@ -110,14 +104,14 @@ func Build(docker *client.Docker, repository string, tags []string, buildArgs ma
 		// parses the Dockerfile. Ignore errors here, as they will have been
 		// caught by validateContextDirectory above.
 		var includes = []string{"."}
-		keepThem1, _ := fileutils.Matches(".dockerignore", excludes)
-		keepThem2, _ := fileutils.Matches(relDockerfile, excludes)
+		keepThem1, _ := patternmatcher.Matches(".dockerignore", excludes)
+		keepThem2, _ := patternmatcher.Matches(relDockerfile, excludes)
 		if keepThem1 || keepThem2 {
 			includes = append(includes, ".dockerignore", relDockerfile)
 		}
 
 		buildCtx, err = archive.TarWithOptions(contextDir, &archive.TarOptions{
-			Compression:     archive.Uncompressed,
+			Compression:     compression.None,
 			ExcludePatterns: excludes,
 			IncludeFiles:    includes,
 		})
@@ -129,30 +123,13 @@ func Build(docker *client.Docker, repository string, tags []string, buildArgs ma
 
 	var body io.Reader = progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
 
-	buildOptions := types.ImageBuildOptions{
+	buildOptions := apiclient.ImageBuildOptions{
 		Tags:           tags,
 		SuppressOutput: quiet,
-		// RemoteContext  string
-		NoCache: true,
-		// Remove         bool
-		// ForceRemove    bool
-		// PullParent     bool
-		// Isolation      container.Isolation
-		// CPUSetCPUs     string
-		// CPUSetMems     string
-		// CPUShares      int64
-		// CPUQuota       int64
-		// CPUPeriod      int64
-		// Memory         int64
-		// MemorySwap     int64
-		// CgroupParent   string
-		// ShmSize        int64
-		Dockerfile: relDockerfile,
-		// Ulimits        []*units.Ulimit
-		BuildArgs: buildArgs,
-		// AuthConfigs    map[string]AuthConfig
-		// Context        io.Reader
-		Labels: labels,
+		NoCache:        true,
+		Dockerfile:     relDockerfile,
+		BuildArgs:      buildArgs,
+		Labels:         labels,
 	}
 	response, err := docker.Client.ImageBuild(context.Background(), body, buildOptions)
 	defer response.Body.Close()
@@ -160,7 +137,7 @@ func Build(docker *client.Docker, repository string, tags []string, buildArgs ma
 
 	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, os.Stdout.Fd(), true, nil)
 	if err != nil {
-		if jerr, ok := err.(*jsonmessage.JSONError); ok {
+		if jerr, ok := err.(*jsonstream.Error); ok {
 			// If no error code is set, default to 1
 			if jerr.Code == 0 {
 				jerr.Code = 1
@@ -174,11 +151,11 @@ func Build(docker *client.Docker, repository string, tags []string, buildArgs ma
 
 // Exists returns APIImages images list and true
 // if the image name exists, otherwise false.
-func Exists(docker *client.Docker, name string) (types.ImageSummary, bool, error) {
+func Exists(docker *client.Docker, name string) (imagetypes.Summary, bool, error) {
 	log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Debug("Searching for image: ", name)
 	images, err := List(docker, name, false)
 	if err != nil {
-		return types.ImageSummary{}, false, err
+		return imagetypes.Summary{}, false, err
 	}
 
 	r := regexp.MustCompile(name)
@@ -194,23 +171,22 @@ func Exists(docker *client.Docker, name string) (types.ImageSummary, bool, error
 	}
 
 	log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Debug("Image NOT Found: ", name)
-	return types.ImageSummary{}, false, nil
+	return imagetypes.Summary{}, false, nil
 }
 
 // List lists all images
-func List(docker *client.Docker, name string, all bool) ([]types.ImageSummary, error) {
+func List(docker *client.Docker, name string, all bool) ([]imagetypes.Summary, error) {
 
-	options := types.ImageListOptions{
+	options := apiclient.ImageListOptions{
 		All: all,
-		// Filters   filters.Args
 	}
-	imageList, err := docker.Client.ImageList(context.Background(), options)
+	result, err := docker.Client.ImageList(context.Background(), options)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 
-	return imageList, nil
+	return result.Items, nil
 }
 
 type searchOptions struct {
@@ -229,21 +205,18 @@ func Search(docker *client.Docker, term string) error {
 
 	opts := searchOptions{
 		term:  term,
-		limit: registry.DefaultSearchLimit,
+		limit: defaultSearchLimit,
 	}
-	options := types.ImageSearchOptions{
-		// RegistryAuth:  encodedAuth,
-		// PrivilegeFunc: requestPrivilege,
-		// Filters: searchFilters,
+	options := apiclient.ImageSearchOptions{
 		Limit: opts.limit,
 	}
 
-	unorderedResults, err := docker.Client.ImageSearch(context.Background(), opts.term, options)
+	searchResult, err := docker.Client.ImageSearch(context.Background(), opts.term, options)
 	if err != nil {
 		return err
 	}
 
-	results := searchResultsByStars(unorderedResults)
+	results := searchResultsByStars(searchResult.Items)
 	sort.Sort(results)
 
 	w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)

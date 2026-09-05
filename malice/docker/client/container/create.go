@@ -1,45 +1,28 @@
 package container
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/docker/distribution/reference"
-	"github.com/docker/docker/api/types"
-	cont "github.com/docker/docker/api/types/container"
-	networktypes "github.com/docker/docker/api/types/network"
-	apiclient "github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/registry"
+	"github.com/containerd/errdefs"
+	"github.com/distribution/reference"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	apiclient "github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/jsonmessage"
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
-	"golang.org/x/net/context"
 )
 
 func pullImage(ctx context.Context, docker *client.Docker, image string, out io.Writer) error {
-	ref, err := reference.ParseNormalizedNamed(image)
-	if err != nil {
+	// Validate the image reference.
+	if _, err := reference.ParseNormalizedNamed(image); err != nil {
 		return err
 	}
 
-	// Resolve the Repository name from fqn to RepositoryInfo
-	_, err = registry.ParseRepositoryInfo(ref)
-	if err != nil {
-		return err
-	}
-
-	// authConfig := dockerCli.ResolveAuthConfig(ctx, repoInfo.Index)
-	// encodedAuth, err := client.EncodeAuthToBase64(authConfig)
-	// if err != nil {
-	// 	return err
-	// }
-
-	options := types.ImageCreateOptions{
-	// RegistryAuth: encodedAuth,
-	}
-
-	responseBody, err := docker.Client.ImageCreate(ctx, image, options)
+	responseBody, err := docker.Client.ImagePull(ctx, image, apiclient.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
@@ -93,64 +76,46 @@ func newCIDFile(path string) (*cidFile, error) {
 }
 
 // createContainer
-func createContainer(docker *client.Docker, ctx context.Context, config *cont.Config, hostConfig *cont.HostConfig, networkingConfig *networktypes.NetworkingConfig, cidfile, name string) (cont.ContainerCreateCreatedBody, error) {
+func createContainer(docker *client.Docker, ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, cidfile, name string) (apiclient.ContainerCreateResult, error) {
 	stderr := os.Stderr
-	// log.Info("cidfile: ", cidfile)
 	var containerIDFile *cidFile
-	// log.Info("containerIDFile: ", containerIDFile)
 	if cidfile != "" {
 		var err error
 		if containerIDFile, err = newCIDFile(cidfile); err != nil {
 			er.CheckError(err)
-			return cont.ContainerCreateCreatedBody{}, err
+			return apiclient.ContainerCreateResult{}, err
 		}
-		// log.Info("NEW containerIDFile: ", containerIDFile)
 		defer containerIDFile.Close()
 	}
 
-	// var trustedRef reference.Canonical
-	// _, ref, err := reference.ParseIDOrReference(config.Image)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if ref != nil {
-	// 	ref = reference.WithDefaultTag(ref)
-
-	// 	if ref, ok := ref.(reference.NamedTagged); ok {
-	// 		var err error
-	// 		trustedRef, err = docker.TrustedReference(ctx, ref)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		config.Image = trustedRef.String()
-	// 	}
-	// }
-
 	//create the container
-	response, err := docker.Client.ContainerCreate(ctx, config, hostConfig, networkingConfig, name)
+	response, err := docker.Client.ContainerCreate(ctx, apiclient.ContainerCreateOptions{
+		Config:           config,
+		HostConfig:       hostConfig,
+		NetworkingConfig: networkingConfig,
+		Name:             name,
+	})
 	er.CheckError(err)
 	//if image not found try to pull it
 	if err != nil {
-		if apiclient.IsErrImageNotFound(err) {
-			// fmt.Fprintf(stderr, "Unable to find image '%s' locally\n", ref.String())
-
+		if errdefs.IsNotFound(err) {
 			// we don't want to write to stdout anything apart from container.ID
 			if err = pullImage(ctx, docker, config.Image, stderr); err != nil {
-				return cont.ContainerCreateCreatedBody{}, err
+				return apiclient.ContainerCreateResult{}, err
 			}
-			// if ref, ok := ref.(reference.NamedTagged); ok != nil {
-			// 	if err := docker.TagTrusted(ctx, trustedRef, ref); err != nil {
-			// 	return nil, err
-			// 	}
-			// }
 			// Retry
 			var retryErr error
-			response, retryErr = docker.Client.ContainerCreate(ctx, config, hostConfig, networkingConfig, name)
+			response, retryErr = docker.Client.ContainerCreate(ctx, apiclient.ContainerCreateOptions{
+				Config:           config,
+				HostConfig:       hostConfig,
+				NetworkingConfig: networkingConfig,
+				Name:             name,
+			})
 			if retryErr != nil {
-				return cont.ContainerCreateCreatedBody{}, retryErr
+				return apiclient.ContainerCreateResult{}, retryErr
 			}
 		} else {
-			return cont.ContainerCreateCreatedBody{}, err
+			return apiclient.ContainerCreateResult{}, err
 		}
 	}
 
@@ -159,7 +124,7 @@ func createContainer(docker *client.Docker, ctx context.Context, config *cont.Co
 	}
 	if containerIDFile != nil {
 		if err = containerIDFile.Write(response.ID); err != nil {
-			return cont.ContainerCreateCreatedBody{}, err
+			return apiclient.ContainerCreateResult{}, err
 		}
 	}
 	return response, nil

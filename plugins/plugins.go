@@ -13,8 +13,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/types/strslice"
-	runconfigopts "github.com/docker/docker/runconfig/opts"
+	"github.com/moby/moby/api/types/strslice"
 	"github.com/malice-plugins/pkgs/utils"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
@@ -60,7 +59,7 @@ func (plugin Plugin) StartPlugin(docker *client.Docker, arg string, scanID strin
 		plugin.Image,       // image string,
 		logs,               // logs bool,
 		binds,              // binds []string,
-		nil,                // portBindings nat.PortMap,
+		nil,                // portBindings network.PortMap,
 		links,              // links []string,
 		env,                // env []string,
 	)
@@ -237,7 +236,7 @@ func (plugin Plugin) UpdatePluginFromRepository(docker *client.Docker) {
 		buildArgs = nil
 	}
 
-	labels := runconfigopts.ConvertKVStringsToMap([]string{"io.malice.plugin.installed.from=repository"})
+	labels := convertKVStringsToMap([]string{"io.malice.plugin.installed.from=repository"})
 
 	image.Build(docker, plugin.Repository, tags, buildArgs, labels, quiet)
 }
@@ -297,6 +296,21 @@ func convertKVStringsToMapWithNil(values []string) map[string]*string {
 			val = parts[1]
 		}
 		m[key] = &val
+	}
+	return m
+}
+
+// convertKVStringsToMap is vendored from docker's
+// runconfig/opts.ConvertKVStringsToMap (package removed in modern SDK).
+func convertKVStringsToMap(values []string) map[string]string {
+	m := make(map[string]string, len(values))
+	for _, value := range values {
+		parts := strings.SplitN(value, "=", 2)
+		if len(parts) == 1 {
+			m[parts[0]] = ""
+		} else {
+			m[parts[0]] = parts[1]
+		}
 	}
 	return m
 }

@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/moby/moby/client"
 	er "github.com/maliceio/malice/malice/errors"
 )
 
 // Ping pings docker client to see if it is up or not by checking Info.
 func (docker *Docker) Ping() bool {
 
-	_, err := docker.Client.Info(context.Background())
+	_, err := docker.Client.Info(context.Background(), client.InfoOptions{})
 	if err != nil {
 		er.CheckError(err)
 		return false

@@ -1,16 +1,15 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api"
-	"github.com/docker/docker/api/server/httputils"
-	"github.com/docker/docker/api/server/middleware"
-
-	"golang.org/x/net/context"
+	"github.com/moby/moby/v2/daemon/config"
+	"github.com/moby/moby/v2/daemon/server/httputils"
+	"github.com/moby/moby/v2/daemon/server/middleware"
 )
 
 func TestMiddlewares(t *testing.T) {
@@ -21,7 +20,11 @@ func TestMiddlewares(t *testing.T) {
 		cfg: cfg,
 	}
 
-	srv.UseMiddleware(middleware.NewVersionMiddleware("0.1omega2", api.DefaultVersion, api.MinVersion))
+	vm, err := middleware.NewVersionMiddleware(cfg.Version, config.MaxAPIVersion, config.MinAPIVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.UseMiddleware(vm)
 
 	req, _ := http.NewRequest("GET", "/containers/json", nil)
 	resp := httptest.NewRecorder()

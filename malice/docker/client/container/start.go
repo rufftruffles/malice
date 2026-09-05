@@ -1,18 +1,16 @@
 package container
 
 import (
+	"context"
 	"errors"
 	"os"
 
-	"golang.org/x/net/context"
-
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/strslice"
-	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/strslice"
+	apiclient "github.com/moby/moby/client"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
@@ -26,15 +24,15 @@ func Start(
 	image string,
 	logs bool,
 	binds []string,
-	portBindings nat.PortMap,
+	portBindings network.PortMap,
 	links []string,
 	env []string,
-) (types.ContainerJSONBase, error) {
+) (container.InspectResponse, error) {
 
 	if docker.Ping() {
 		// Check that all requirements for the container to run are ready
 		if !checkContainerRequirements(docker, name, image) {
-			return types.ContainerJSONBase{}, errors.New("container is already running")
+			return container.InspectResponse{}, errors.New("container is already running")
 		}
 
 		createContConf := &container.Config{
@@ -42,26 +40,25 @@ func Start(
 			Cmd:   cmd,
 			Env:   env,
 		}
-		// resources := container.Resources{
-		// 	Memory:   config.Conf.Docker.Memory, // Memory: Memory limit (in bytes)
-		// 	NanoCPUs: config.Conf.Docker.CPU,    // NanoCPUs: CPU quota in units of 10<sup>-9</sup> CPUs.
-		// }
 		hostConfig := &container.HostConfig{
-			Binds: binds,
-			// NetworkMode:  "malice",
+			Binds:        binds,
 			PortBindings: portBindings,
 			Links:        links,
 			Privileged:   false,
-			// Resources:    resources,
 		}
 		networkingConfig := &network.NetworkingConfig{}
 
-		contResponse, err := docker.Client.ContainerCreate(context.Background(), createContConf, hostConfig, networkingConfig, name)
+		contResponse, err := docker.Client.ContainerCreate(context.Background(), apiclient.ContainerCreateOptions{
+			Config:           createContConf,
+			HostConfig:       hostConfig,
+			NetworkingConfig: networkingConfig,
+			Name:             name,
+		})
 		if err != nil {
 			log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Errorf("CreateContainer error = %s\n", err)
 		}
 
-		err = docker.Client.ContainerStart(context.Background(), contResponse.ID, types.ContainerStartOptions{})
+		_, err = docker.Client.ContainerStart(context.Background(), contResponse.ID, apiclient.ContainerStartOptions{})
 		if err != nil {
 			log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Errorf("StartContainer error = %s\n", err)
 		}
@@ -71,21 +68,18 @@ func Start(
 		}
 
 		contJSON, err := Inspect(docker, contResponse.ID)
-		return *contJSON.ContainerJSONBase, err
+		return contJSON, err
 	}
-	return types.ContainerJSONBase{}, errors.New("Cannot connect to the Docker daemon. Is the docker daemon running on this host?")
+	return container.InspectResponse{}, errors.New("Cannot connect to the Docker daemon. Is the docker daemon running on this host?")
 }
 
 // LogContainer tails container logs to terminal
 func LogContainer(docker *client.Docker, contID string) {
 
-	options := types.ContainerLogsOptions{
+	options := apiclient.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
-		// Since       string
-		// Timestamps  bool
-		Follow: true,
-		// Tail        string
+		Follow:     true,
 	}
 
 	logs, err := docker.Client.ContainerLogs(context.Background(), contID, options)

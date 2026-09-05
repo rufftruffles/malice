@@ -1,17 +1,16 @@
 package container
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
 
-	"golang.org/x/net/context"
-
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/strslice"
-	"github.com/docker/docker/pkg/archive"
-	"github.com/docker/docker/pkg/system"
+	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/strslice"
+	apiclient "github.com/moby/moby/client"
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
 	"github.com/maliceio/malice/malice/maldirs"
@@ -50,7 +49,6 @@ func CopyToVolume(docker *client.Docker, file persist.File) {
 			"volSavePath":    volSavePath,
 			"SampledsDir":    maldirs.GetSampledsDir(),
 		}).Debug("First statContainerPath call.")
-		// er.CheckError(err)
 
 		// Check if file already exists in volume
 		if dstStat.Size > 0 {
@@ -61,7 +59,7 @@ func CopyToVolume(docker *client.Docker, file persist.File) {
 		// If the destination is a symbolic link, we should evaluate it.
 		if err == nil && dstStat.Mode&os.ModeSymlink != 0 {
 			linkTarget := dstStat.LinkTarget
-			if !system.IsAbs(linkTarget) {
+			if !filepath.IsAbs(linkTarget) {
 				// Join with the parent directory.
 				dstParent, _ := archive.SplitPathDirEntry(volSavePath)
 				linkTarget = filepath.Join(dstParent, linkTarget)
@@ -106,18 +104,17 @@ func CopyToVolume(docker *client.Docker, file persist.File) {
 		resolvedDstPath = dstDir
 		content = preparedArchive
 
-		copyOptions := types.CopyToContainerOptions{
-			AllowOverwriteDirWithFile: true,
-		}
-
 		// Copy sample to malice volume
-		er.CheckError(docker.Client.CopyToContainer(
+		_, copyErr := docker.Client.CopyToContainer(
 			context.Background(),
 			cont.ID,
-			resolvedDstPath,
-			content,
-			copyOptions,
-		))
+			apiclient.CopyToContainerOptions{
+				DestinationPath:           resolvedDstPath,
+				Content:                   content,
+				AllowOverwriteDirWithFile: true,
+			},
+		)
+		er.CheckError(copyErr)
 	}
 }
 
@@ -126,9 +123,13 @@ func resolveLocalPath(localPath string) (absPath string, err error) {
 		return
 	}
 
-	return archive.PreserveTrailingDotOrSeparator(absPath, localPath, filepath.Separator), nil
+	return archive.PreserveTrailingDotOrSeparator(absPath, localPath), nil
 }
 
-func statContainerPath(docker *client.Docker, containerName, path string) (types.ContainerPathStat, error) {
-	return docker.Client.ContainerStatPath(context.Background(), containerName, path)
+func statContainerPath(docker *client.Docker, containerName, path string) (container.PathStat, error) {
+	result, err := docker.Client.ContainerStatPath(context.Background(), containerName, apiclient.ContainerStatPathOptions{Path: path})
+	if err != nil {
+		return container.PathStat{}, err
+	}
+	return result.Stat, nil
 }

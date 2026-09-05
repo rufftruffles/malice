@@ -6,10 +6,10 @@ import (
 	"runtime"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/client"
 	"github.com/malice-plugins/pkgs/utils"
 	"github.com/maliceio/malice/config"
-	"golang.org/x/net/context"
+	"github.com/moby/moby/client"
+	"context"
 )
 
 // NOTE: https://github.com/eris-ltd/eris-cli/blob/master/perform/docker_run.go
@@ -30,26 +30,24 @@ func NewDockerClient() *Docker {
 	switch os := runtime.GOOS; os {
 	case "linux":
 		log.Debug("Running inside Docker...")
-		defaultHeaders := map[string]string{"User-Agent": "engine-api-cli-1.0"}
-		docker, err = client.NewClient("unix:///var/run/docker.sock", "v1.22", nil, defaultHeaders)
+		docker, err = client.NewClientWithOpts(client.WithHost("unix:///var/run/docker.sock"), client.WithAPIVersionNegotiation())
 		ip = "localhost"
 		port = "2375"
 	case "darwin":
 		log.Debug("Running on Docker for Mac...")
-		defaultHeaders := map[string]string{"User-Agent": "engine-api-cli-1.0"}
-		docker, err = client.NewClient("unix:///var/run/docker.sock", "v1.22", nil, defaultHeaders)
+		docker, err = client.NewClientWithOpts(client.WithHost("unix:///var/run/docker.sock"), client.WithAPIVersionNegotiation())
 		ip = "localhost"
 		port = "2375"
 	case "windows":
-		log.Debug("Running on Docker for Windows or docker-machine on a Windows host...")
-		docker, err = client.NewEnvClient()
+		log.Debug("Running on Docker for Windows...")
+		docker, err = client.NewClientWithOpts(client.WithHostFromEnv(), client.WithAPIVersionNegotiation())
 		if err != nil {
 			log.Fatal(err)
 		}
 		ip, port, err = parseDockerEndoint(utils.Getopt("DOCKER_HOST", config.Conf.Docker.EndPoint))
 	default:
 		log.Debug("Creating NewEnvClient...")
-		docker, err = client.NewEnvClient()
+		docker, err = client.NewClientWithOpts(client.WithHostFromEnv(), client.WithAPIVersionNegotiation())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -59,7 +57,7 @@ func NewDockerClient() *Docker {
 		log.Fatal(err)
 	}
 	// Check if client can connect
-	if _, err = docker.Info(context.Background()); err != nil {
+	if _, err = docker.Info(context.Background(), client.InfoOptions{}); err != nil {
 		handleClientError(err)
 	} else {
 		log.WithFields(log.Fields{"ip": ip, "port": port}).Debug("Connected to docker daemon client")
@@ -85,31 +83,16 @@ func handleClientError(dockerError error) {
 		case "darwin":
 			if _, err := os.Stat("/Applications/Docker.app"); os.IsNotExist(err) {
 				log.Info("Please install Docker for Mac - https://docs.docker.com/docker-for-mac/")
-				log.Info("= OR =")
-				log.Info("Please install docker-machine by running: ")
-				log.Info(" - brew install docker-machine")
-				log.Infof(" - docker-machine create -d virtualbox %s", config.Conf.Docker.Name)
-				log.Infof(" - eval $(docker-machine env %s)", config.Conf.Docker.Name)
 			} else {
 				log.Info("Please start Docker for Mac.")
-				log.Info("= OR =")
-				log.Info("Please start and source the docker-machine env by running: ")
-				log.Infof(" - docker-machine start %s", config.Conf.Docker.Name)
-				log.Infof(" - eval $(docker-machine env %s)", config.Conf.Docker.Name)
 			}
 		case "linux":
 			log.Info("Please start the docker daemon. `sudo service docker start`")
 		case "windows":
 			if _, err := exec.LookPath("/Applications/Docker.app"); err != nil {
 				log.Info("Please install Docker for Windows - https://docs.docker.com/docker-for-windows/")
-				log.Info("= OR =")
-				log.Info("Please install docker-toolbox - https://www.docker.com/docker-toolbox")
 			} else {
 				log.Info("Please start Docker for Windows.")
-				log.Info("= OR =")
-				log.Info("Please start and source the docker-machine env by running: ")
-				log.Infof(" - docker-machine start %s", config.Conf.Docker.Name)
-				log.Infof(" - eval $(docker-machine env %s)", config.Conf.Docker.Name)
 			}
 		}
 		os.Exit(2)

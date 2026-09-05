@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -8,20 +9,21 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/server/httputils"
-	"github.com/docker/docker/api/server/middleware"
-	"github.com/docker/docker/api/server/router"
-	"github.com/docker/docker/dockerversion"
 	"github.com/gorilla/mux"
-	"golang.org/x/net/context"
+	"github.com/moby/moby/api/types/common"
+	"github.com/moby/moby/v2/daemon/server/httputils"
+	"github.com/moby/moby/v2/daemon/server/httpstatus"
+	"github.com/moby/moby/v2/daemon/server/middleware"
+	"github.com/moby/moby/v2/daemon/server/router"
+	"github.com/moby/moby/v2/dockerversion"
 )
 
 // versionMatcher defines a variable matcher to be parsed by the router
 // when a request is about to be served.
 const versionMatcher = "/v{version:[0-9.]+}"
 
-// notFoundError implements docker's api/errdefs.ErrNotFound interface so
-// httputils.MakeErrorHandler maps it to HTTP 404.
+// notFoundError implements containerd/errdefs' NotFound interface so
+// httpstatus.FromError maps it to HTTP 404.
 type notFoundError struct{ err error }
 
 func (e notFoundError) Error() string { return e.err.Error() }
@@ -136,7 +138,7 @@ func (s *Server) makeHTTPHandler(handler httputils.APIFunc) http.HandlerFunc {
 		// apply to all requests. Data that is specific to the
 		// immediate function being called should still be passed
 		// as 'args' on the function call.
-		ctx := context.WithValue(context.Background(), dockerversion.UAStringKey, r.Header.Get("User-Agent"))
+		ctx := dockerversion.WithUpstreamUserAgent(context.Background(), r.Header.Get("User-Agent"))
 		handlerFunc := s.handlerWithGlobalMiddlewares(handler)
 
 		vars := mux.Vars(r)
@@ -145,11 +147,11 @@ func (s *Server) makeHTTPHandler(handler httputils.APIFunc) http.HandlerFunc {
 		}
 
 		if err := handlerFunc(ctx, w, r, vars); err != nil {
-			statusCode := httputils.GetHTTPErrorStatusCode(err)
+			statusCode := httpstatus.FromError(err)
 			if statusCode >= 500 {
 				logrus.Errorf("Handler for %s %s returned error: %v", r.Method, r.URL.Path, err)
 			}
-			httputils.MakeErrorHandler(err)(w, r)
+			_ = httputils.WriteJSON(w, statusCode, &common.ErrorResponse{Message: err.Error()})
 		}
 	}
 }
@@ -184,7 +186,10 @@ func (s *Server) createMux() *mux.Router {
 	}
 
 	err := notFoundError{fmt.Errorf("page not found")}
-	notFoundHandler := httputils.MakeErrorHandler(err)
+	notFoundHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		statusCode := httpstatus.FromError(err)
+		_ = httputils.WriteJSON(w, statusCode, &common.ErrorResponse{Message: err.Error()})
+	})
 	m.HandleFunc(versionMatcher+"/{path:.*}", notFoundHandler)
 	m.NotFoundHandler = notFoundHandler
 

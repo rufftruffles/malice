@@ -1,74 +1,73 @@
 package container
 
 import (
+	"context"
 	"strings"
 
-	"golang.org/x/net/context"
-
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/types"
+	"github.com/moby/moby/api/types/container"
+	apiclient "github.com/moby/moby/client"
 	"github.com/maliceio/malice/config"
 	"github.com/maliceio/malice/malice/docker/client"
 	er "github.com/maliceio/malice/malice/errors"
 )
 
-// List returns array of types.Containers and error
-func List(docker *client.Docker, all bool) ([]types.Container, error) {
-	options := types.ContainerListOptions{
+// List returns array of container.Summary and error
+func List(docker *client.Docker, all bool) ([]container.Summary, error) {
+	options := apiclient.ContainerListOptions{
 		All: true,
-		// Limit:  opts.last,
-		// Size:   opts.size,
-		// Filter: containerFilterArgs,
 	}
-	containers, err := docker.Client.ContainerList(context.Background(), options)
+	result, err := docker.Client.ContainerList(context.Background(), options)
 	if err != nil {
 		return nil, err
 	}
-	return containers, nil
+	return result.Items, nil
 }
 
-// Inspect returns types.ContainerJSON from Container ID
+// Inspect returns container.InspectResponse from Container ID
 // if the container name exists, otherwise false.
-func Inspect(docker *client.Docker, id string) (types.ContainerJSON, error) {
-	contJSON, err := docker.Client.ContainerInspect(context.Background(), id)
-	return contJSON, err
+func Inspect(docker *client.Docker, id string) (container.InspectResponse, error) {
+	result, err := docker.Client.ContainerInspect(context.Background(), id, apiclient.ContainerInspectOptions{})
+	if err != nil {
+		return container.InspectResponse{}, err
+	}
+	return result.Container, nil
 }
 
-// Exists returns APIContainers containers list and true
+// Exists returns container.Summary and true
 // if the container name exists, otherwise false.
-func Exists(docker *client.Docker, name string) (types.Container, bool, error) {
+func Exists(docker *client.Docker, name string) (container.Summary, bool, error) {
 	return parseContainers(docker, strings.TrimLeft(name, "/"), true)
 }
 
-// Running returns APIContainers containers list and true
+// Running returns container.Summary and true
 // if the container name exists and is running, otherwise false.
-func Running(docker *client.Docker, name string) (types.Container, bool, error) {
+func Running(docker *client.Docker, name string) (container.Summary, bool, error) {
 	return parseContainers(docker, strings.TrimLeft(name, "/"), false)
 }
 
-func parseContainers(docker *client.Docker, name string, all bool) (types.Container, bool, error) {
+func parseContainers(docker *client.Docker, name string, all bool) (container.Summary, bool, error) {
 	// list containers
 	log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Debug("Searching for container: ", name)
 	containers, err := List(docker, all)
 	if err != nil {
-		return types.Container{}, false, err
+		return container.Summary{}, false, err
 	}
 	// locate docker container that matches name
 	if len(containers) != 0 {
-		for _, container := range containers {
-
-			cont, err := Inspect(docker, container.ID)
+		for _, cont := range containers {
+			contJSON, err := Inspect(docker, cont.ID)
 			er.CheckError(err)
 
-			log.Debugln("name: ", name, " ", "container.Name: ", strings.TrimLeft(cont.Name, "/"))
-			log.Debugln("MATCH: ", strings.EqualFold(strings.TrimLeft(cont.Name, "/"), name))
+			log.Debugln("name: ", name, " ", "container.Name: ", strings.TrimLeft(contJSON.Name, "/"))
+			log.Debugln("MATCH: ", strings.EqualFold(strings.TrimLeft(contJSON.Name, "/"), name))
 
-			if strings.EqualFold(strings.TrimLeft(cont.Name, "/"), name) {
+			if strings.EqualFold(strings.TrimLeft(contJSON.Name, "/"), name) {
 				log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Debug("Container FOUND: ", name)
-				return container, true, nil
+				return cont, true, nil
 			}
 		}
 	}
 	log.WithFields(log.Fields{"env": config.Conf.Environment.Run}).Debug("Container NOT Found: ", name)
-	return types.Container{}, false, nil
+	return container.Summary{}, false, nil
 }

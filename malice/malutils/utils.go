@@ -11,12 +11,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/docker/machine/libmachine/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // GetHomeDir returns the home directory
-// TODO: Having this here just strikes me as dangerous, but some of the drivers
-// depend on it ;_;
 func GetHomeDir() string {
 	if runtime.GOOS == "windows" {
 		return os.Getenv("USERPROFILE")

@@ -3,8 +3,8 @@ package router
 import (
 	"net/http"
 
-	"github.com/docker/docker/api/server/httputils"
-	"golang.org/x/net/context"
+	"github.com/moby/moby/v2/daemon/server/httputils"
+	"context"
 )
 
 // RouteWrapper wraps a route with extra functionality.

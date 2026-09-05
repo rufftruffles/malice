@@ -1,18 +1,16 @@
 package container
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
 
-	"golang.org/x/net/context"
-
 	log "github.com/sirupsen/logrus"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/versions"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/events"
+	apiclient "github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/versions"
 	er "github.com/maliceio/malice/malice/errors"
 
 	"github.com/maliceio/malice/config"
@@ -31,43 +29,11 @@ func noNetHostConfig() *container.HostConfig {
 
 func getResources() container.Resources {
 	return container.Resources{
-		// // Applicable to all platforms
-		// CPUShares int64 `json:"CpuShares"` // CPU shares (relative weight vs. other containers)
 		Memory:   config.Conf.Docker.Memory, // Memory    int64 // Memory limit (in bytes)
 		NanoCPUs: config.Conf.Docker.CPU,    // NanoCPUs  int64 `json:"NanoCpus"` // CPU quota in units of 10<sup>-9</sup> CPUs.
-
-		// // Applicable to UNIX platforms
-		// CgroupParent         string // Parent cgroup.
-		// BlkioWeight          uint16 // Block IO weight (relative weight vs. other containers)
-		// BlkioWeightDevice    []*blkiodev.WeightDevice
-		// BlkioDeviceReadBps   []*blkiodev.ThrottleDevice
-		// BlkioDeviceWriteBps  []*blkiodev.ThrottleDevice
-		// BlkioDeviceReadIOps  []*blkiodev.ThrottleDevice
-		// BlkioDeviceWriteIOps []*blkiodev.ThrottleDevice
-		// CPUPeriod            int64           `json:"CpuPeriod"`          // CPU CFS (Completely Fair Scheduler) period
-		// CPUQuota             int64           `json:"CpuQuota"`           // CPU CFS (Completely Fair Scheduler) quota
-		// CPURealtimePeriod    int64           `json:"CpuRealtimePeriod"`  // CPU real-time period
-		// CPURealtimeRuntime   int64           `json:"CpuRealtimeRuntime"` // CPU real-time runtime
-		// CpusetCpus           string          // CpusetCpus 0-2, 0,1
-		// CpusetMems           string          // CpusetMems 0-2, 0,1
-		// Devices              []DeviceMapping // List of devices to map inside the container
-		// DeviceCgroupRules    []string        // List of rule to be added to the device cgroup
-		// DiskQuota            int64           // Disk limit (in bytes)
-		// KernelMemory         int64           // Kernel memory limit (in bytes)
-		// MemoryReservation    int64           // Memory soft limit (in bytes)
-		// MemorySwap           int64           // Total memory usage (memory + swap); set `-1` to enable unlimited swap
-		// MemorySwappiness     *int64          // Tuning container memory swappiness behaviour
-		// OomKillDisable       *bool           // Whether to disable OOM Killer or not
-		// PidsLimit            int64           // Setting pids limit for a container
-		// Ulimits              []*units.Ulimit // List of ulimits to be set in the container
-
-		// // Applicable to Windows
-		// CPUCount           int64  `json:"CpuCount"`   // CPU count
-		// CPUPercent         int64  `json:"CpuPercent"` // CPU percent
-		// IOMaximumIOps      uint64 // Maximum IOps for the container system drive
-		// IOMaximumBandwidth uint64 // Maximum IO in bytes per second for the container system drive
 	}
 }
+
 func waitExitOrRemoved(ctx context.Context, docker *client.Docker, containerID string, waitRemove bool) chan int {
 	if len(containerID) == 0 {
 		// containerID can never be empty
@@ -79,19 +45,21 @@ func waitExitOrRemoved(ctx context.Context, docker *client.Docker, containerID s
 	exitCode := 125
 
 	// Get events via Events API
-	f := filters.NewArgs()
+	f := make(apiclient.Filters)
 	f.Add("type", "container")
 	f.Add("container", containerID)
-	options := types.EventsOptions{
+	options := apiclient.EventsListOptions{
 		Filters: f,
 	}
 	eventCtx, cancel := context.WithCancel(ctx)
-	eventq, errq := docker.Client.Events(eventCtx, options)
+	eventResult := docker.Client.Events(eventCtx, options)
+	eventq := eventResult.Messages
+	errq := eventResult.Err
 
 	eventProcessor := func(e events.Message) bool {
 		stopProcessing := false
-		switch e.Status {
-		case "die":
+		switch e.Action {
+		case events.ActionDie:
 			if v, ok := e.Actor.Attributes["exitCode"]; ok {
 				code, cerr := strconv.Atoi(v)
 				if cerr != nil {
@@ -107,7 +75,7 @@ func waitExitOrRemoved(ctx context.Context, docker *client.Docker, containerID s
 				// We need to fall back to the old behavior, which is client-side removal
 				if versions.LessThan(docker.Client.ClientVersion(), "1.25") {
 					go func() {
-						removeErr = docker.Client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{RemoveVolumes: true})
+						_, removeErr = docker.Client.ContainerRemove(ctx, containerID, apiclient.ContainerRemoveOptions{RemoveVolumes: true})
 						if removeErr != nil {
 							log.Errorf("error removing container: %v", removeErr)
 							cancel() // cancel the event Q
@@ -115,10 +83,10 @@ func waitExitOrRemoved(ctx context.Context, docker *client.Docker, containerID s
 					}()
 				}
 			}
-		case "detach":
+		case events.ActionDetach:
 			exitCode = 0
 			stopProcessing = true
-		case "destroy":
+		case events.ActionDestroy:
 			stopProcessing = true
 		}
 		return stopProcessing
