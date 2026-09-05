@@ -19,6 +19,7 @@ import (
 	"github.com/maliceio/malice/malice/docker/client/image"
 	er "github.com/maliceio/malice/malice/errors"
 	"github.com/maliceio/malice/malice/maldirs"
+	"github.com/maliceio/malice/secrets"
 	"github.com/moby/moby/api/types/strslice"
 	"github.com/parnurzeal/gorequest"
 	log "github.com/sirupsen/logrus"
@@ -126,8 +127,8 @@ func RunIntelPlugins(docker *client.Docker, hash string, scanID string, logs, el
 func (plugin *Plugin) getPluginEnv() []string {
 	var env []string
 	for _, pluginEnv := range plugin.Env {
-		if os.Getenv(pluginEnv) != "" {
-			env = append(env, fmt.Sprintf("%s=%s", pluginEnv, os.Getenv(pluginEnv)))
+		if secrets.Get(pluginEnv) != "" {
+			env = append(env, fmt.Sprintf("%s=%s", pluginEnv, secrets.Get(pluginEnv)))
 		}
 	}
 	return env

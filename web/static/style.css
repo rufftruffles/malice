@@ -577,3 +577,29 @@ button { font-family: inherit; cursor: pointer; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---------- Settings form (engine credentials) ---------- */
+.settings-form { display: flex; flex-direction: column; gap: 20px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.field-row { display: flex; gap: 8px; }
+.field-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: var(--canvas);
+  color: var(--ink);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.field-input::placeholder { color: var(--ink-faint); }
+.field-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.field-clear { white-space: nowrap; }
+.field-clear:disabled { opacity: 0.4; cursor: not-allowed; }
+.field-hint { font-size: 12.5px; color: var(--ink-muted); line-height: 1.4; }
+.form-actions { display: flex; align-items: center; gap: 14px; margin-top: 2px; }
+.form-msg { font-size: 13px; color: var(--ink-muted); }
+.form-msg.ok { color: var(--green); }
+.form-msg.err { color: var(--danger); }

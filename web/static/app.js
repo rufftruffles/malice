@@ -454,6 +454,132 @@ async function renderEngines() {
   view.innerHTML = html;
 }
 
+/* ---------- Settings view (engine credentials) ---------- */
+const SETTINGS_KEYS = ["VIRUSTOTAL_API_KEY", "ESET_LICENSE_KEY"];
+const SETTINGS_META = {
+  VIRUSTOTAL_API_KEY: ["VirusTotal API key", "Used by the virustotal engine for hash lookups. Leave blank to keep the current value."],
+  ESET_LICENSE_KEY: ["ESET license key", "Used by the eset engine. Leave blank to keep the current value or to run unlicensed."],
+};
+
+function settingsHeaders() {
+  const headers = { "Content-Type": "application/json", Accept: "application/json" };
+  const el = $("#admin-token");
+  const tok = (el && el.value.trim()) || localStorage.getItem("malice_admin_token") || "";
+  if (tok) {
+    localStorage.setItem("malice_admin_token", tok);
+    headers["Authorization"] = "Bearer " + tok;
+  }
+  return headers;
+}
+async function postSettings(payload) {
+  const r = await fetch("/api/settings", { method: "POST", headers: settingsHeaders(), body: JSON.stringify(payload) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
+  return j;
+}
+
+async function renderSettings() {
+  view.innerHTML = `<div class="empty"><div class="spinner"></div></div>`;
+  let data;
+  try {
+    data = await api.get("/api/settings");
+  } catch (e) {
+    view.innerHTML = `<div class="empty"><div class="e-ico">${I.alert}</div><div class="e-title">Cannot load settings</div><div class="e-sub">${esc(e.message)}</div></div>`;
+    return;
+  }
+  const keys = data.keys || {};
+  const adminRequired = !!data.admin_token_required;
+  let html = `
+    <div class="page-head">
+      <div><h1 class="page-title">Settings</h1>
+      <p class="page-sub">Engine credentials · stored on the host, applied to new scans</p></div>
+    </div>
+    <div class="card">
+      <h3>Engine credentials</h3>
+      <form id="settings-form" class="settings-form" autocomplete="off">`;
+  for (const name of SETTINGS_KEYS) {
+    const [label, hint] = SETTINGS_META[name];
+    const cur = keys[name] || "";
+    html += `
+      <div class="field">
+        <label class="field-label" for="key-${name}">${label}</label>
+        <div class="field-row">
+          <input class="field-input mono" id="key-${name}" type="password" spellcheck="false"
+            placeholder="${cur ? "Set — " + esc(cur) + " (leave blank to keep)" : "Not set"}" value="">
+          <button type="button" class="btn field-clear" data-clear="${name}" ${cur ? "" : "disabled"}>Clear</button>
+        </div>
+        <div class="field-hint">${hint}</div>
+      </div>`;
+  }
+  html += `
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <span class="form-msg" id="settings-msg"></span>
+      </div>
+    </form>
+    </div>`;
+  if (adminRequired) {
+    html += `
+    <div class="card">
+      <h3>Admin token</h3>
+      <div class="field">
+        <label class="field-label" for="admin-token">MALICE_ADMIN_TOKEN</label>
+        <div class="field-row">
+          <input class="field-input mono" id="admin-token" type="password" spellcheck="false"
+            placeholder="Enter the admin token" value="">
+        </div>
+        <div class="field-hint">This server requires an admin token to change credentials. It is kept only in this browser (localStorage) and sent with each save.</div>
+      </div>
+    </div>`;
+  }
+  view.innerHTML = html;
+  wireSettings(adminRequired);
+}
+
+function wireSettings(adminRequired) {
+  const form = $("#settings-form");
+  if (!form) return;
+  if (adminRequired) {
+    const tokEl = $("#admin-token");
+    if (tokEl) tokEl.value = localStorage.getItem("malice_admin_token") || "";
+  }
+  $$("[data-clear]").forEach((b) => b.addEventListener("click", () => clearKey(b.dataset.clear)));
+  form.addEventListener("submit", (e) => { e.preventDefault(); saveSettings(); });
+}
+
+async function saveSettings() {
+  const msg = $("#settings-msg");
+  const payload = {};
+  for (const name of SETTINGS_KEYS) {
+    const el = $(`#key-${name}`);
+    if (el && el.value.trim() !== "") payload[name] = el.value.trim();
+  }
+  if (Object.keys(payload).length === 0) {
+    if (msg) { msg.textContent = "Nothing to save (all fields blank)."; msg.className = "form-msg"; }
+    return;
+  }
+  try {
+    const j = await postSettings(payload);
+    if (msg) { msg.textContent = "Saved " + (j.updated || []).length + " key(s)."; msg.className = "form-msg ok"; }
+    toast("Settings saved");
+    renderSettings();
+  } catch (e) {
+    if (msg) { msg.textContent = e.message; msg.className = "form-msg err"; }
+    if (/token|unauthorized|401/i.test(e.message)) toast("Admin token required or invalid", true);
+  }
+}
+
+async function clearKey(name) {
+  try {
+    await postSettings({ [name]: "" });
+    toast("Cleared " + name);
+    renderSettings();
+  } catch (e) {
+    toast("Clear failed: " + e.message, true);
+    if (/token|unauthorized|401/i.test(e.message)) toast("Admin token required or invalid", true);
+  }
+}
+
 /* ---------- Router ---------- */
 function route() {
   const hash = location.hash || "#/scans";
@@ -461,6 +587,7 @@ function route() {
   $$(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.nav === (parts[0] || "scans")));
 
   if (parts[0] === "engines") { renderEngines(); return; }
+  if (parts[0] === "settings") { renderSettings(); return; }
   if (parts[0] === "scans" && parts[1]) { renderScanDetail(parts[1]); return; }
   // default: scans list
   api.get("/api/scans?size=50").then(renderScans).catch((e) => {

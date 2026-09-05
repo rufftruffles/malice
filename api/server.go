@@ -10,11 +10,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/maliceio/malice/config"
+	"github.com/maliceio/malice/malice/maldirs"
 	"github.com/maliceio/malice/plugins"
+	"github.com/maliceio/malice/secrets"
 	"github.com/maliceio/malice/web"
 	log "github.com/sirupsen/logrus"
 )
@@ -35,10 +38,14 @@ var scanFunc func(path string) error
 // SetScanFunc wires the scan entry point (commands.APIScan) into the API.
 func SetScanFunc(fn func(path string) error) { scanFunc = fn }
 
-// Init loads plugins and configures the ES endpoint.
+// Init loads plugins, configures the ES endpoint, and opens the
+// file-backed secrets store (engine credentials entered via the web UI).
 func Init() {
 	InitES()
 	plugins.Load()
+	if err := secrets.Init(filepath.Join(maldirs.GetBaseDir(), "secrets.env")); err != nil {
+		log.Errorf("secrets: init: %v", err)
+	}
 }
 
 // Start runs the HTTP server (REST API + embedded UI) on addr.
@@ -48,6 +55,7 @@ func Start(addr string) error {
 	mux.HandleFunc("/api/scans", handleScans)
 	mux.HandleFunc("/api/scans/", handleScanDetail)
 	mux.HandleFunc("/api/plugins", handlePlugins)
+	mux.HandleFunc("/api/settings", handleSettings)
 	uiFS := http.FileServerFS(web.FS())
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -363,3 +371,78 @@ func pluginsOf(raw json.RawMessage) map[string]map[string]json.RawMessage {
 }
 
 var _ = fmt.Sprintf
+
+// settingsKeys is the allowlist of engine credentials the web UI may set.
+// Only these keys are accepted by POST; anything else is rejected so a client
+// cannot write arbitrary keys into the secrets store.
+var settingsKeys = []string{"VIRUSTOTAL_API_KEY", "ESET_LICENSE_KEY"}
+
+func settingsKeyAllowed(k string) bool {
+	for _, a := range settingsKeys {
+		if k == a {
+			return true
+		}
+	}
+	return false
+}
+
+// handleSettings serves the engine-credential settings page.
+//
+//	GET  -> { keys: { NAME: "****abcd" | "", admin_token_required: bool } }
+//	POST -> { NAME: value, ... } (allowlist + validation; values never logged)
+//
+// GET is unauthenticated (it only returns masked values, safe to expose). POST
+// is a state-changing route, so if MALICE_ADMIN_TOKEN is configured it is
+// required (Authorization: Bearer <token>). The rest of the API is unauthenticated
+// (single-user trusted-network tool), so the token is opt-in hardening, not a
+// hard requirement.
+func handleSettings(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		keys := map[string]string{}
+		for _, k := range settingsKeys {
+			keys[k] = secrets.Mask(k)
+		}
+		writeJSON(w, map[string]interface{}{
+			"keys":                 keys,
+			"admin_token_required": os.Getenv("MALICE_ADMIN_TOKEN") != "",
+		})
+	case http.MethodPost:
+		if tok := os.Getenv("MALICE_ADMIN_TOKEN"); tok != "" {
+			if r.Header.Get("Authorization") != "Bearer "+tok {
+				writeErr(w, http.StatusUnauthorized, "admin token required")
+				return
+			}
+		}
+		// Cap the body so a client cannot send an unbounded payload.
+		r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
+		var payload map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			writeErr(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		updated := []string{}
+		for k, v := range payload {
+			if !settingsKeyAllowed(k) {
+				writeErr(w, http.StatusBadRequest, "unknown key: "+k)
+				return
+			}
+			// secrets.Set validates the key name and value (length/charset) and
+			// its error never contains the value, so it is safe to surface.
+			if err := secrets.Set(k, v); err != nil {
+				writeErr(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			updated = append(updated, k)
+		}
+		sort.Strings(updated)
+		// Log only which keys changed, never the values.
+		log.Infof("settings: updated %d credential key(s): %v", len(updated), updated)
+		writeJSON(w, map[string]interface{}{
+			"status":  "ok",
+			"updated": updated,
+		})
+	default:
+		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
