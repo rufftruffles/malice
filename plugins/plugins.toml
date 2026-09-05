@@ -138,3 +138,13 @@ title = "Malice Plugin Configurations"
   repository = "https://github.com/malice-plugins/capa.git"
   build = false
   mime = "*"
+
+[[plugin]]
+  enabled = true
+  name = "diec"
+  description = "Detect-It-Easy - file type + packer/protector identification"
+  category = "exe"
+  image = "malice/diec"
+  repository = "https://github.com/malice-plugins/diec.git"
+  build = false
+  mime = "*"
