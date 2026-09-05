@@ -41,6 +41,7 @@ services:
 
 networks:
   malice-net:
+    name: malice-net
 
 volumes:
   es_data:
