@@ -27,12 +27,10 @@ title = "Malice Plugin Configurations"
   image = "malice/virustotal"
   repository = "https://github.com/malice-plugins/virustotal.git"
   build = false
-  upload = false # Set upload to `true` if you want to upload sample to virustotal.com
-  apikey = "2539516d471d7beb6b28a720d7a25024edc0f7590d345fc747418645002ac47b" # This is a test key, please replace with your own
   cmd = "lookup"
   mime = "hash"
   hashtypes = [ "md5", "sha1", "sha256" ]
-  env = ["MALICE_VT_API", "MALICE_TIMEOUT"]
+  env = ["VIRUSTOTAL_API_KEY", "MALICE_TIMEOUT"]
 
 [[plugin]]
   enabled = true
@@ -118,3 +116,13 @@ title = "Malice Plugin Configurations"
   mime = "application/pdf"
   cmd = "scan"
 
+
+[[plugin]]
+  enabled = true
+  name = "capa"
+  description = "CAPA - capability detection (mandiant/capa)"
+  category = "av"
+  image = "malice/capa"
+  repository = "https://github.com/malice-plugins/capa.git"
+  build = false
+  mime = "*"
