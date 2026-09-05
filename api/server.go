@@ -3,9 +3,9 @@ package api
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -196,15 +196,37 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "scan backend not wired")
 		return
 	}
+	// Admit the upload only if a scan slot is free, BEFORE parsing: each upload
+	// can hold up to maxUploadBytes during parse, so bounding concurrency here
+	// bounds both concurrent uploads and concurrent 17-engine scans.
+	select {
+	case scanSem <- struct{}{}:
+	default:
+		writeErr(w, http.StatusTooManyRequests, "too many scans in progress; try again shortly")
+		return
+	}
+	// The slot is released exactly once: by the scan goroutine on success, or by
+	// releaseSlot() on every error path. A panic in scanInitFunc must not leak it.
+	semHeld := true
+	releaseSlot := func() {
+		if semHeld {
+			semHeld = false
+			<-scanSem
+		}
+	}
 	// Cap the total request body before parsing; ParseMultipartForm alone only
 	// bounds the in-memory portion and would spool an unbounded body to /tmp.
+	// The 32MB memory limit forces large files to spool to disk, not RAM.
 	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
-	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
+	if err := r.ParseMultipartForm(32<<20); err != nil {
+		releaseSlot()
+		log.Errorf("parse multipart: %v", err)
 		writeErr(w, http.StatusBadRequest, "invalid or oversized upload")
 		return
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
+		releaseSlot()
 		writeErr(w, http.StatusBadRequest, "missing 'file' field")
 		return
 	}
@@ -216,48 +238,56 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	dir, err := os.MkdirTemp("", "malice-upload-")
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "temp dir: "+err.Error())
+		releaseSlot()
+		log.Errorf("temp dir: %v", err)
+		writeErr(w, http.StatusInternalServerError, "failed to store upload")
 		return
 	}
 	dstPath := filepath.Join(dir, name)
 	dst, err := os.Create(dstPath)
 	if err != nil {
+		releaseSlot()
 		os.RemoveAll(dir)
-		writeErr(w, http.StatusInternalServerError, "create temp file: "+err.Error())
+		log.Errorf("create temp file: %v", err)
+		writeErr(w, http.StatusInternalServerError, "failed to store upload")
 		return
 	}
 	h := sha256.New()
 	if _, err := io.Copy(io.MultiWriter(dst, h), file); err != nil {
 		dst.Close()
+		releaseSlot()
 		os.RemoveAll(dir)
-		writeErr(w, http.StatusInternalServerError, "store upload: "+err.Error())
+		log.Errorf("store upload: %v", err)
+		writeErr(w, http.StatusInternalServerError, "failed to store upload")
 		return
 	}
 	dst.Close()
 	sha := hex.EncodeToString(h.Sum(nil))
 
-	// Admit the scan only if a slot is free; otherwise reject with 429 rather
-	// than queueing unbounded concurrent 17-engine scans.
-	select {
-	case scanSem <- struct{}{}:
-	default:
-		os.RemoveAll(dir)
-		writeErr(w, http.StatusTooManyRequests, "too many scans in progress; try again shortly")
-		return
-	}
-
 	// Generate the scan id synchronously (fast setup + file store) so it can be
 	// returned in the response. The web client keys its in-flight set by scan id
 	// (not SHA) so re-uploading a file whose SHA already has completed scans does
-	// not mask those verdicts behind a "Scanning" badge.
-	scanID, err := scanInitFunc(dstPath)
+	// not mask those verdicts behind a "Scanning" badge. A panic in scanInitFunc
+	// is recovered so it cannot leak the scan slot.
+	scanID, err := func() (id string, e error) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Errorf("scan init panic: %v", rec)
+				e = errors.New("failed to start scan")
+			}
+		}()
+		return scanInitFunc(dstPath)
+	}()
 	if err != nil {
-		<-scanSem
+		releaseSlot()
 		os.RemoveAll(dir)
-		writeErr(w, http.StatusInternalServerError, "start scan: "+err.Error())
+		log.Errorf("start scan: %v", err)
+		writeErr(w, http.StatusInternalServerError, "failed to start scan")
 		return
 	}
 
+	// Success: the goroutine owns the slot release.
+	semHeld = false
 	go func() {
 		defer func() {
 			<-scanSem
@@ -267,7 +297,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 			os.RemoveAll(dir)
 		}()
 		if err := scanRunFunc(dstPath, scanID); err != nil {
-			log.Errorf("scan of %s failed: %v", name, err)
+			log.Errorf("scan of %q failed: %v", name, err)
 		}
 	}()
 
@@ -366,12 +396,11 @@ func summarizeScan(raw json.RawMessage) map[string]interface{} {
 		verdict = "threat"
 	}
 	// engines_expected is how many of the enabled engines apply to this
-	// file's MIME type - the correct denominator for progress. Older docs
-	// have no mime_type; for those the client falls back to the total.
-	expected := 0
-	if mime, _ := doc.File["mime_type"].(string); mime != "" {
-		expected = len(plugins.ScanPlugins(mime, true))
-	}
+	// file's MIME type - the correct denominator for progress. An empty MIME
+	// (undetectable) still yields the wildcard+intel set (getMime guards the
+	// empty needle), so the denominator is never 0 for a real scan.
+	mime, _ := doc.File["mime_type"].(string)
+	expected := len(plugins.ScanPlugins(mime, true))
 	return map[string]interface{}{
 		"file":             doc.File,
 		"scan_date":        doc.ScanDate,
@@ -398,8 +427,6 @@ func pluginsOf(raw json.RawMessage) map[string]map[string]json.RawMessage {
 	_ = json.Unmarshal(raw, &doc)
 	return doc.Plugins
 }
-
-var _ = fmt.Sprintf
 
 // settingsKeys is the allowlist of engine credentials the web UI may set.
 // Only these keys are accepted by POST; anything else is rejected so a client

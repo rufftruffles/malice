@@ -178,13 +178,26 @@ func getMime(mime string, plugins []Plugin) []Plugin {
 	}
 	for _, plugin := range plugins {
 		wildcard := strings.Contains(plugin.Mime, "*")
-		// An empty/undetectable MIME must not match every plugin (strings.Contains
-		// with an empty needle is always true); only wildcard plugins run then.
-		if wildcard || (mime != "" && strings.Contains(plugin.Mime, mime)) {
+		// An empty/undetectable MIME must not match every plugin; only wildcard
+		// plugins run then. Non-wildcard plugins match on an exact MIME token
+		// (comma-separated in the toml), not a substring, so a PIE ELF
+		// (application/x-pie-executable) does not match a plugin listing
+		// application/x-executable.
+		if wildcard || (mime != "" && mimeInList(plugin.Mime, mime)) {
 			mimeMatch = append(mimeMatch, plugin)
 		}
 	}
 	return mimeMatch
+}
+
+// mimeInList reports whether mime is one of the exact, comma-separated MIME tokens in list.
+func mimeInList(list, mime string) bool {
+	for _, m := range strings.Split(list, ",") {
+		if strings.TrimSpace(m) == mime {
+			return true
+		}
+	}
+	return false
 }
 
 // getEnabled returns a map[string]plugin of enabled plugins

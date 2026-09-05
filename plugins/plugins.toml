@@ -137,7 +137,7 @@ title = "Malice Plugin Configurations"
   image = "malice/capa"
   repository = "https://github.com/malice-plugins/capa.git"
   build = false
-  mime = "application/x-dosexec, application/x-executable, application/x-elf, application/x-mach-binary"
+  mime = "application/x-dosexec, application/x-executable, application/x-pie-executable, application/x-sharedlib, application/x-mach-binary"
 
 [[plugin]]
   enabled = true
@@ -147,7 +147,7 @@ title = "Malice Plugin Configurations"
   image = "malice/diec"
   repository = "https://github.com/malice-plugins/diec.git"
   build = false
-  mime = "application/x-dosexec, application/x-executable, application/x-elf, application/x-object, application/x-shared-lib"
+  mime = "application/x-dosexec, application/x-executable, application/x-pie-executable, application/x-object, application/x-sharedlib"
 
 [[plugin]]
   enabled = true
@@ -167,7 +167,7 @@ title = "Malice Plugin Configurations"
   image = "malice/rizin"
   repository = "https://github.com/malice-plugins/rizin.git"
   build = false
-  mime = "application/x-dosexec, application/x-executable, application/x-elf, application/x-object, application/x-shared-lib, application/x-mach-binary"
+  mime = "application/x-dosexec, application/x-executable, application/x-pie-executable, application/x-object, application/x-sharedlib, application/x-mach-binary"
 
 [[plugin]]
   enabled = true

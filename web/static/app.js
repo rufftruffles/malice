@@ -56,8 +56,10 @@ const api = {
 /* ---------- State ---------- */
 const state = {
   totalEngines: 17,
-  active: new Map(), // scan id -> { lastReported, stable, startedAt, name, sha }
+  active: new Map(), // scan id -> { lastReported, stable, startedAt, name, sha, missing }
   pollTimer: null,
+  pollInFlight: false, // re-entrancy guard for the poll tick
+  uploading: false,    // an upload is in flight (preserve its progress bar)
 };
 
 /* ---------- Helpers ---------- */
@@ -288,23 +290,34 @@ async function uploadFile(file) {
     const h = location.hash || "#/scans";
     return h.startsWith("#/scans") && !h.includes("#/scans/");
   };
+  let res;
   try {
-    const res = await api.upload(file, (loaded, total) => updateUploadProgress(loaded, total));
-    if (res.id) {
-      state.active.set(res.id, { lastReported: 0, stable: 0, startedAt: Date.now(), name: file.name, sha: res.sha256 });
-    }
-    ensurePolling();
-    // refresh the list (also restores the dropzone after the progress bar)
-    const data = await api.get("/api/scans?size=50");
-    if (onScansList()) renderScans(data); else resetDropzone();
+    res = await api.upload(file, (loaded, total) => updateUploadProgress(loaded, total));
   } catch (e) {
+    state.uploading = false;
     resetDropzone();
     toast("Upload failed: " + e.message, true);
+    return;
+  }
+  // Upload succeeded; the scan is in flight. Refresh the list (also restores
+  // the dropzone to the scan-progress bar). A failure here is non-fatal: the
+  // poll loop picks the scan up on its next tick.
+  state.uploading = false;
+  if (res.id) {
+    state.active.set(res.id, { lastReported: 0, stable: 0, startedAt: Date.now(), name: file.name, sha: res.sha256 });
+  }
+  ensurePolling();
+  try {
+    const data = await api.get("/api/scans?size=50");
+    if (onScansList()) renderScans(data); else resetDropzone();
+  } catch {
+    // non-fatal: the poll loop refreshes the list on its next tick
   }
 }
 
 /* ---------- Upload progress ---------- */
 function showUploadProgress(name, size) {
+  state.uploading = true;
   const dz = $("#dropzone");
   if (!dz) return;
   dz.classList.add("uploading");
@@ -327,6 +340,7 @@ function updateUploadProgress(loaded, total) {
   if (bytesEl) bytesEl.textContent = fmtSize(loaded);
 }
 function resetDropzone() {
+  state.uploading = false;
   const dz = $("#dropzone");
   if (!dz) return;
   dz.classList.remove("uploading");
@@ -604,47 +618,70 @@ function route() {
 function ensurePolling() {
   if (state.pollTimer) return;
   state.pollTimer = setInterval(async () => {
-    if (state.active.size === 0) { clearInterval(state.pollTimer); state.pollTimer = null; return; }
-    // mark stable/timeout. On timeout set 99 so the entry is removed below;
-    // previously it set stable=1, which never reached the 99 the removal checks,
-    // so a scan absent from the list (ES down at upload, failed write, deleted)
-    // kept polling /api/scans every 2.5s forever.
-    for (const [id, a] of state.active) {
-      if (Date.now() - a.startedAt > 150000) a.stable = 99;
-    }
-    let data;
-    try { data = await api.get("/api/scans?size=100"); } catch { return; }
-    const byId = {};
-    for (const s of data.scans || []) if (s.id) byId[s.id] = s;
-    let changed = false;
-    for (const [id, a] of state.active) {
-      const s = byId[id];
-      if (s && s.engines_reported !== a.lastReported) { a.lastReported = s.engines_reported; a.stable = 0; changed = true; }
-      else if (s) {
-        a.stable = (a.stable || 0) + 1;
-        // Settle only after a quiet window AND a minimum elapsed time. Engines
-        // report in bursts, and the slowest (eset's on-demand AV scan) can report
-        // ~50-60s in, so the old 3-poll (7.5s) window, and even a 30s minimum,
-        // settled mid-scan and froze the detection count at a partial value (it
-        // only corrected on a hard refresh, e.g. 5/17 instead of the final 6/17).
-        // Require 20s of quiet AND 75s elapsed so every engine, including slow
-        // AV, has reported before the scan is marked done.
-        if (a.stable >= 8 && Date.now() - a.startedAt > 75000) a.stable = 99;
+    // Re-entrancy guard: a slow tick (API latency) must not overlap the next,
+    // or two ticks would double-fetch and double-render.
+    if (state.pollInFlight) return;
+    state.pollInFlight = true;
+    try {
+      if (state.active.size === 0) { clearInterval(state.pollTimer); state.pollTimer = null; return; }
+      // Hard timeout: drop any entry older than 150s so a scan absent from the
+      // list (ES down at upload, failed write, deleted) does not poll forever.
+      for (const [id, a] of state.active) {
+        if (Date.now() - a.startedAt > 150000) a.stable = 99;
       }
-      if (a.stable === 99) state.active.delete(id);
-    }
-    // re-render if on scans list or a detail of an active scan
-    const hash = location.hash || "";
-    if (changed || hash.startsWith("#/scans")) {
+      let data;
+      try { data = await api.get("/api/scans?size=100"); } catch { return; }
+      const byId = {};
+      for (const s of data.scans || []) if (s.id) byId[s.id] = s;
+      let changed = false;
+      for (const [id, a] of state.active) {
+        const s = byId[id];
+        if (s) {
+          a.missing = 0;
+          if (s.engines_reported !== a.lastReported) { a.lastReported = s.engines_reported; a.stable = 0; changed = true; }
+          else {
+            a.stable = (a.stable || 0) + 1;
+            // Settle only after a quiet window AND a minimum elapsed time. Engines
+            // report in bursts, and the slowest (eset's on-demand AV scan) can report
+            // ~50-60s in, so the old 3-poll (7.5s) window, and even a 30s minimum,
+            // settled mid-scan and froze the detection count at a partial value (it
+            // only corrected on a hard refresh, e.g. 5/17 instead of the final 6/17).
+            // Require 20s of quiet AND 75s elapsed so every engine, including slow
+            // AV, has reported before the scan is marked done.
+            if (a.stable >= 8 && Date.now() - a.startedAt > 75000) a.stable = 99;
+          }
+        } else {
+          // The scan is not in the polled list. If it stays absent for several
+          // polls (ES index lag, deleted doc, id mismatch), drop it so the
+          // dropzone resets to idle instead of freezing at "0 of N engines
+          // reported". The doc is created synchronously before the upload
+          // response, so a real scan is indexed well within this window.
+          a.missing = (a.missing || 0) + 1;
+          if (a.missing >= 8) a.stable = 99;
+        }
+        if (a.stable === 99) state.active.delete(id);
+      }
+      // List view: re-render every tick (cheap; keeps the dropzone + badges
+      // fresh). Detail view: re-render only when an active scan actually
+      // changed, to avoid flicker and a detail fetch every 2.5s.
+      const hash = location.hash || "";
       const parts = hash.replace(/^#\//, "").split("/").filter(Boolean);
       if (parts[0] === "scans" && parts[1]) {
-        const id = parts[1];
-        try { const d = await api.get("/api/scans/" + id); renderScanDetail(id); } catch {}
+        if (changed) {
+          const id = parts[1];
+          try { await api.get("/api/scans/" + id); renderScanDetail(id); } catch {}
+        }
       } else if (parts[0] === "scans") {
-        renderScans(data);
+        // Skip the re-render while an upload is in flight so the upload
+        // progress bar is not clobbered; the list refreshes after the upload.
+        if (!state.uploading) {
+          try { renderScans(data); } catch (e) { console.error("renderScans", e); }
+        }
       }
+      if (state.active.size === 0 && state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+    } finally {
+      state.pollInFlight = false;
     }
-    if (state.active.size === 0 && state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
   }, 2500);
 }
 
