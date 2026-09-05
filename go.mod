@@ -95,4 +95,4 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 )
 
-replace github.com/malice-plugins/pkgs => github.com/rufftruffles/malice-plugins v1.0.1
+replace github.com/malice-plugins/pkgs => github.com/rufftruffles/malice-plugins v1.0.2

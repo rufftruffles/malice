@@ -137,8 +137,8 @@ github.com/prometheus/procfs v0.21.1/go.mod h1:aB55Cww9pdSJVHk0hUf0inxWyyjPogFIj
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
-github.com/rufftruffles/malice-plugins v1.0.1 h1:BiTGJvTLph2a9TVVuQMCw0Uwpnq9qxa5L5W9edlnEF8=
-github.com/rufftruffles/malice-plugins v1.0.1/go.mod h1:GWk2dpoGcfdhD/b0Drc2yininqBJVtjNcX9HxmDOB6E=
+github.com/rufftruffles/malice-plugins v1.0.2 h1:Rfeae7HTkCQqIX1JYHb71Mz60kw5HZVXr5tDWgCvjj0=
+github.com/rufftruffles/malice-plugins v1.0.2/go.mod h1:GWk2dpoGcfdhD/b0Drc2yininqBJVtjNcX9HxmDOB6E=
 github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf35Ld67mk=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sirupsen/logrus v1.10.2 h1:G2SED73/qrAu6YwbdxOD6peLkCBI3z7L+ykJFTXJBBo=
