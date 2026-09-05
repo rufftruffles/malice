@@ -148,3 +148,13 @@ title = "Malice Plugin Configurations"
   repository = "https://github.com/malice-plugins/diec.git"
   build = false
   mime = "*"
+
+[[plugin]]
+  enabled = true
+  name = "lmd"
+  description = "Linux Malware Detect (rfxn/linux-malware-detect) - signature-based AV scan"
+  category = "av"
+  image = "malice/lmd"
+  repository = "https://github.com/malice-plugins/lmd.git"
+  build = false
+  mime = "*"
