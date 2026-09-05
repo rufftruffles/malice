@@ -98,7 +98,7 @@ title = "Malice Plugin Configurations"
   mime = "application/x-dosexec"
 
 [[plugin]]
-  enabled = false
+  enabled = true
   name = "office"
   description = "Office - tool to triage OLE/RTF documents"
   category = "document"
